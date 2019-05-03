@@ -1,25 +1,28 @@
 import * as io from 'socket.io-client';
 import chalk from 'chalk';
-import * as prompt from 'prompt';
+const readline = require('readline');
 const log = console.log;
 
 const socket = io('http://localhost:4242');
 
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
 const main = (name: string) => {
     log(`I am now ${chalk.bold.red(name)}`)
-    const query = () => {
-        prompt.get(['command', 'args'], (err: any, { command, args }: { command: string, args: string }) => {
-            if (err) log(chalk.red(err));
-            if (command === 'exit') process.exit();
-            socket.emit(command, { args }, (ack: any) => {
-                log(`Ack: ${ack}`);
-                query();
-            });
-        })
-    }
-    prompt.start();
-    query();
-}
+    rl.on('line', (input: string) => {
+        const args = input.split(' ', 2);
+        const cmd = args[0];
+        const param = args[1] || null;
+        if (cmd === 'exit') process.exit();
+        socket.emit(cmd, { param }, (ack: any) => {
+            log(`Ack: ${ack}`);
+        });
+    });
+    rl.on('SIGINT', () => process.exit());
+};
 
 socket.emit('register', {}, (ack: any) => {
     main(ack.name);

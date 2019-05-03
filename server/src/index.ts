@@ -30,13 +30,13 @@ class Node {
         this.knows = [];
         nameToNode.set(this.name, this);
 
-        socket.on('connectTo', ({ args }: { args: string }, callback: any) => {
-            if (this.addKnownNodeByName(args)) {
-                log(chalk.green(`${this.name} connects to ${args}`));
+        socket.on('c', ({ param }: { param: string }, callback: any) => {
+            if (this.addKnownNodeByName(param)) {
+                log(chalk.green(`${this.name} connects to ${param}`));
                 callback('Connection successful.')
             }
             else {
-                log(chalk.red(`${this.name} connect to ${args} failed`));
+                log(chalk.red(`${this.name} connect to ${param} failed`));
                 callback('Connection failed.')
             }
         })
