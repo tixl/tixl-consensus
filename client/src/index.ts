@@ -13,9 +13,8 @@ const rl = readline.createInterface({
 const main = (name: string) => {
     log(`I am now ${chalk.bold.red(name)}`)
     rl.on('line', (input: string) => {
-        const args = input.split(' ', 2);
-        const cmd = args[0];
-        const param = args[1] || null;
+        const cmd = input.slice(0, input.indexOf(' ') || undefined);
+        const param = input.slice(input.indexOf(' ') + 1 || 0)
         if (cmd === 'exit') process.exit();
         socket.emit(cmd, { param }, (ack: any) => {
             log(`Ack: ${ack}`);
@@ -27,3 +26,5 @@ const main = (name: string) => {
 socket.emit('register', {}, (ack: any) => {
     main(ack.name);
 })
+
+socket.on('broadcast', ({ msg, by }: { msg: string, by: string }) => log(`${chalk.red.bold(by)}: ${chalk.green(msg)}`));
