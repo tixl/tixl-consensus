@@ -1,12 +1,12 @@
 import NodeIdentifier from "./NodeIdentifier";
 
 export default class Slices {
-    slices: NodeIdentifier[][];
-    constructor(slices: NodeIdentifier[][]) {
+    slices: Set<Set<NodeIdentifier>>;
+    constructor(slices: Set<Set<NodeIdentifier>>) {
         this.slices = slices;
     }
 
-    addSlice(slice: NodeIdentifier[]) {
-        this.slices.push(slice);
+    addSlice(slice: Set<NodeIdentifier>) {
+        this.slices.add(slice);
     }
 }

@@ -11,4 +11,14 @@ export default class AcceptMessage extends Message {
         super(origin, slices, topic, value);
         this.type = "ACCEPT";
     }
+
+    export() {
+        return {
+            origin: this.origin,
+            slices: this.slices,
+            topic: this.topic,
+            value: this.value,
+            type: this.type,
+        }
+    }
 }

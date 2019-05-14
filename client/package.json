@@ -37,7 +37,7 @@
     "socket.io-client": "^2.2.0"
   },
   "devDependencies": {
-    "@types/jest": "^23.3.3",
+    "@types/jest": "^24.0.13",
     "@types/node": "^10.11.4",
     "@types/socket.io-client": "^1.4.32",
     "coveralls": "^3.0.2",

@@ -11,4 +11,14 @@ export default class VoteMessage extends Message {
         super(origin, slices, topic, value);
         this.type = "VOTE";
     }
+
+    export() {
+        return {
+            origin: this.origin,
+            slices: this.slices,
+            topic: this.topic,
+            value: this.value,
+            type: this.type,
+        }
+    }
 }
