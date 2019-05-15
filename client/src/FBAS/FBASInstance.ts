@@ -4,10 +4,10 @@ import AcceptMessage from './messages/AcceptMessage';
 import Topic from './Topic';
 import Quorum from './Quorum';
 import Slices from './Slice';
-import NodeIdentifier from './NodeIdentifier';
+import NodeIdentifier, { NodePK } from './NodeIdentifier';
 import NodeState from './NodeState';
 
-export type InstanceState = Map<string, NodeState>;
+export type InstanceState = Map<NodePK, NodeState>;
 
 export class FBASInstance {
     topic: Topic;
