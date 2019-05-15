@@ -78,4 +78,38 @@ describe('findQuorum', () => {
         expect(result).toEqual(expected);
 
     })
+
+
+    test('should not find a quorum when depended node diagrees', () => {
+        const a = NI('a');
+        const b = NI('b');
+        const c = NI('c');
+        const d = NI('d');
+        const e = NI('e');
+
+        const aSlice = SL([[b, c]]);
+        const bSlice = SL([[d]]);
+        const cSlice = SL([[b]]);
+        const dSlice = SL([[]]);
+        const eSlice = SL([[d]]);
+
+        const aState = ST(true, aSlice);
+        const bState = ST(true, bSlice);
+        const cState = ST(true, cSlice);
+        const dState = ST(false, dSlice);
+        const eState = ST(false, eSlice);
+
+        const state = new Map();
+        state.set(a.pk, aState);
+        state.set(b.pk, bState);
+        state.set(c.pk, cState);
+        state.set(d.pk, dState);
+        state.set(e.pk, eState);
+        const result = findQuorum(a, state, true);
+
+        const expected = null;
+
+        expect(result).toEqual(expected);
+
+    })
 })
