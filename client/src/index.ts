@@ -6,12 +6,12 @@ import { NodeIdentifier } from './FBAS/NodeIdentifier';
 import Slices from './FBAS/Slice';
 import VoteMessage from './FBAS/messages/VoteMessage';
 import Topic from './FBAS/Topic';
+import AcceptMessage from './FBAS/messages/AcceptMessage';
 const readline = require('readline');
 const log = console.log;
 const jlog = (obj: any) => log(JSON.stringify(obj, null, 2));
 
 const socket = io('http://localhost:4242');
-
 
 const slices = new Set<Set<NodeIdentifier>>();
 const fbasMap = new Map<string, FBASInstance>();
@@ -75,6 +75,11 @@ const main = (name: string) => {
             const voteMsg = new VoteMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             const fbas = getFbasForTopic(message.topic.value);
             fbas.receiveMessage(voteMsg);
+        }
+        if (message.type === 'ACCEPT') {
+            const acceptMsg = new AcceptMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
+            const fbas = getFbasForTopic(message.topic.value);
+            fbas.receiveMessage(acceptMsg);
         }
     });
 

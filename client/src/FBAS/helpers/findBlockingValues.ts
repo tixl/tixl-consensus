@@ -3,7 +3,7 @@ import { InstanceState } from "../FBASInstance";
 
 export const findBlockingValues = (node: NodeIdentifier, state: InstanceState) => {
     const nodeState = state.get(node);
-    if (!nodeState || !nodeState.slices) return null;
+    if (!nodeState || !nodeState.slices) return [];
     const slices = nodeState.slices.toArray();
     const states = slices.map(slice => slice.map(n => {
         const nState = state.get(n);

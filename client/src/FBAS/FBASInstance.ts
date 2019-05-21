@@ -8,6 +8,7 @@ import { NodeIdentifier } from './NodeIdentifier';
 import NodeState from './NodeState';
 import { findQuorum, Phase } from './helpers/findQuorum';
 import Network from '../Network';
+import { findBlockingValues } from './helpers/findBlockingValues';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
 
@@ -43,11 +44,25 @@ export class FBASInstance {
     }
 
     castVote(value: boolean) {
+        console.log(`Vote value ${value} for topic ${this.topic.value}`);
         this.vote = value;
         const msg = new VoteMessage(this.id, this.slices, this.topic, value);
         this.updateState(this.id, (oldState: NodeState) => {
             oldState.setSlices(this.slices);
             oldState.setVote(value);
+            return oldState;
+        })
+        this.broadcast(msg);
+        this.onStateUpdated();
+    }
+
+    acceptValue(value: boolean) {
+        console.log(`Accept value ${value} for topic ${this.topic.value}`);
+        this.accept = value;
+        const msg = new AcceptMessage(this.id, this.slices, this.topic, value);
+        this.updateState(this.id, (oldState: NodeState) => {
+            oldState.setSlices(this.slices);
+            oldState.setAccept(value);
             return oldState;
         })
         this.broadcast(msg);
@@ -98,14 +113,29 @@ export class FBASInstance {
 
     onStateUpdated() {
         console.log('state updated');
-        if (!this.vote) return;
-        const quorum = findQuorum(this.id, this.state, this.vote, Phase.ACCEPT);
-        if (quorum) {
-            console.log(`Found a vote - quorum on topic ${this.topic.value} with value ${this.vote}`);
-            quorum.print();
+        if (this.vote === null) return;
+        if (this.vote !== null && this.accept === null) {
+            const quorum = findQuorum(this.id, this.state, this.vote, Phase.ACCEPT);
+            if (quorum) {
+                console.log(`Found a vote - quorum on topic ${this.topic.value} with value ${this.vote}`);
+                this.acceptValue(this.vote);
+                quorum.print();
+            }
+            else {
+                const blockingValues = findBlockingValues(this.id, this.state);
+                if (blockingValues.length === 0) {
+                    console.log('No blocking values found')
+                }
+                if (blockingValues.length === 2) {
+                    console.log('Contradicting blocking values found')
+                }
+                if (blockingValues.length === 1) {
+                    const value = blockingValues[0];
+                    console.log(`Found blocking set for value ${value} on topic ${this.topic}`);
+                    this.acceptValue(value);
+                }
+            }
         }
-        else {
-            console.log('No quorum found so far.')
-        }
+
     }
 }
