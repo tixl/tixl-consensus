@@ -1,5 +1,5 @@
 import Message from './Message';
-import NodeIdentifier from "../NodeIdentifier";
+import { NodeIdentifier } from "../NodeIdentifier";
 import Slices from '../Slice';
 import Topic from '../Topic';
 

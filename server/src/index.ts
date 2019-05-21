@@ -23,16 +23,18 @@ const nameToNode = new Map<string, Node>();
 class Node {
     name: string;
     socket: socketio.Socket;
-    knows: Node[];
+    trusts: Node[];
+    trustedBy: Node[];
     constructor(socket: socketio.Socket) {
         this.name = namor.generate({ manly: true, words: 1, numbers: 0 });
         this.socket = socket;
-        this.knows = [];
+        this.trusts = [];
+        this.trustedBy = [];
         nameToNode.set(this.name, this);
 
         socket.on('c', ({ param }: { param: string }, callback: any) => {
-            if (this.addKnownNodeByName(param)) {
-                log(chalk.green(`${this.name} connects to ${param}`));
+            if (this.addTrustedNodeByName(param)) {
+                log(chalk.green(`${this.name} trusts ${param}`));
                 callback('Connection successful.')
             }
             else {
@@ -41,23 +43,38 @@ class Node {
             }
         })
 
+        socket.on('broadcast', (obj: any) => {
+            this.broadcast(obj);
+            log(`${this.name} broadcasts: ${JSON.stringify(obj, null, 2)}`);
+        })
+
         socket.on('disconnect', () => {
             log(chalk.red(`${this.name} disconnected`))
-            this.knows.forEach((node) => node.removeKnownNode(this));
+            this.trusts.forEach((node) => node.removeKnownNode(this));
             nameToNode.delete(this.name);
         })
     }
 
     removeKnownNode(node: Node) {
-        this.knows = this.knows.filter(x => x.name !== node.name);
+        this.trusts = this.trusts.filter(x => x.name !== node.name);
+        node.trustedBy = node.trustedBy.filter(x => x.name !== this.name);
     }
 
-    addKnownNodeByName(name: string): boolean {
+    broadcast(obj: any) {
+        // this.trustedBy.forEach(node => {
+        //     node.socket.emit('broadcast', { by: this.name, msg });
+        // })
+        for (let node of nameToNode.values()) {
+            node.socket.emit('broadcast', obj);
+        }
+    };
+
+    addTrustedNodeByName(name: string): boolean {
         try {
             const node = nameToNode.get(name);
-            if(!node) return false;
-            this.knows.push(node);
-            node.knows.push(this);
+            if (!node) return false;
+            this.trusts.push(node);
+            node.trustedBy.push(this);
             return true;
         }
         catch (error) {
@@ -68,9 +85,9 @@ class Node {
 
 setInterval(() => {
     log('');
-    log(chalk.green('ACTIVE CONNECTIONS'))
+    log(chalk.green('ACTIVE TRUSTS'))
     for (let [, node] of nameToNode) {
-        log(`${node.name}: ${node.knows.map(x => x.name)}`)
+        log(`${node.name}: ${node.trusts.map(x => x.name)}`)
     }
     log('');
 }, 60000);

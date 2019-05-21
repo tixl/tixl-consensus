@@ -6,10 +6,14 @@ export default class NodeState {
     confirm: boolean | null;
     slices: Slices;
 
-    constructor(slices: Slices) {
+    constructor(slices?: Slices) {
         this.vote = null;
         this.accept = null;
         this.confirm = null;
+        this.slices = slices || new Slices();
+    }
+
+    setSlices(slices: Slices) {
         this.slices = slices;
     }
 

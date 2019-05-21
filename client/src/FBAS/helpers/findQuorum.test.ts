@@ -1,10 +1,10 @@
 import 'jest';
 import Slices from '../Slice';
-import NodeIdentifier from '../NodeIdentifier';
+import { NodeIdentifier } from '../NodeIdentifier';
 import NodeState from '../NodeState';
 import { findQuorum } from './findQuorum';
 
-const NI = (label: string) => new NodeIdentifier(label, label);
+const NI = (label: string) => label;
 const SL = (slices: NodeIdentifier[][]) =>
     new Slices(new Set(slices.map(slice => new Set(slice))));
 const ST = (val: boolean, slices: Slices) => {
@@ -33,16 +33,16 @@ describe('findQuorum', () => {
         const eState = ST(true, eSlice);
 
         const state = new Map();
-        state.set(a.pk, aState);
-        state.set(b.pk, bState);
-        state.set(c.pk, cState);
-        state.set(d.pk, dState);
-        state.set(e.pk, eState);
+        state.set(a, aState);
+        state.set(b, bState);
+        state.set(c, cState);
+        state.set(d, dState);
+        state.set(e, eState);
         const result = findQuorum(a, state, true);
 
         const expected = new Set([a, b, c, d]);
 
-        expect(result).toEqual(expected);
+        expect(result!.nodes).toEqual(expected);
 
     })
 
@@ -66,16 +66,16 @@ describe('findQuorum', () => {
         const eState = ST(false, eSlice);
 
         const state = new Map();
-        state.set(a.pk, aState);
-        state.set(b.pk, bState);
-        state.set(c.pk, cState);
-        state.set(d.pk, dState);
-        state.set(e.pk, eState);
+        state.set(a, aState);
+        state.set(b, bState);
+        state.set(c, cState);
+        state.set(d, dState);
+        state.set(e, eState);
         const result = findQuorum(a, state, true);
 
         const expected = new Set([a, b, c, d]);
 
-        expect(result).toEqual(expected);
+        expect(result!.nodes).toEqual(expected);
 
     })
 
@@ -100,11 +100,11 @@ describe('findQuorum', () => {
         const eState = ST(false, eSlice);
 
         const state = new Map();
-        state.set(a.pk, aState);
-        state.set(b.pk, bState);
-        state.set(c.pk, cState);
-        state.set(d.pk, dState);
-        state.set(e.pk, eState);
+        state.set(a, aState);
+        state.set(b, bState);
+        state.set(c, cState);
+        state.set(d, dState);
+        state.set(e, eState);
         const result = findQuorum(a, state, true);
 
         const expected = null;

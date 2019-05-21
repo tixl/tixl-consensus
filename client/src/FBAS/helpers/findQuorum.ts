@@ -1,12 +1,13 @@
 import { InstanceState } from "../FBASInstance";
-import NodeIdentifier from "../NodeIdentifier";
+import { NodeIdentifier } from "../NodeIdentifier";
 import { setDifference } from "./setDifference";
 import { isSuperset } from "./isSuperset";
+import Quorum from "../Quorum";
 
-export const findQuorum = (node: NodeIdentifier, state: InstanceState, value: boolean) => {
+export const findQuorum = (node: NodeIdentifier, state: InstanceState, value: boolean): Quorum | null => {
 
     const nodeAgrees = (node: NodeIdentifier) => {
-        const nodeState = state.get(node.pk);
+        const nodeState = state.get(node);
         if (nodeState && (nodeState.vote || nodeState.confirm)) {
             let nodeValue = nodeState.confirm || nodeState.vote;
             if (nodeValue === value) return true;
@@ -22,7 +23,7 @@ export const findQuorum = (node: NodeIdentifier, state: InstanceState, value: bo
     }
 
     const getNodeSlices = (node: NodeIdentifier) => {
-        const nodeState = state.get(node.pk);
+        const nodeState = state.get(node);
         if (nodeState && nodeState.slices) {
             return nodeState.slices.slices;
         }
@@ -46,11 +47,11 @@ export const findQuorum = (node: NodeIdentifier, state: InstanceState, value: bo
         return true;
     };
 
-    const findQuorumForNodes = (nodes: Set<NodeIdentifier>): Set<NodeIdentifier> | null => {
+    const findQuorumForNodes = (nodes: Set<NodeIdentifier>): Quorum | null => {
         // Is not a quorum on the value we are looking for
         if (!nodesAgree(nodes)) return null;
         // Is a quorum
-        if (isQuorum(nodes)) return nodes;
+        if (isQuorum(nodes)) return new Quorum(nodes);
         // Not enough nodes for a quorum, add more to transitive hull
         for (let node of nodes) {
             let slices = getNodeSlices(node);

@@ -4,10 +4,12 @@ import AcceptMessage from './messages/AcceptMessage';
 import Topic from './Topic';
 import Quorum from './Quorum';
 import Slices from './Slice';
-import NodeIdentifier, { NodePK } from './NodeIdentifier';
+import { NodeIdentifier } from './NodeIdentifier';
 import NodeState from './NodeState';
+import { findQuorum } from './helpers/findQuorum';
+import Network from '../Network';
 
-export type InstanceState = Map<NodePK, NodeState>;
+export type InstanceState = Map<NodeIdentifier, NodeState>;
 
 export class FBASInstance {
     topic: Topic;
@@ -20,13 +22,13 @@ export class FBASInstance {
     slices: Slices; // My Slices
     id: NodeIdentifier; // My ID
     state: InstanceState;
-    broadcast: (obj: any) => void;
+    network: Network;
 
-    constructor(topic: Topic, id: NodeIdentifier, slices: Slices, broadcast: (obj: any) => void) {
+    constructor(topic: Topic, id: NodeIdentifier, slices: Slices, network: Network) {
         this.topic = topic;
         this.id = id;
         this.slices = slices;
-        this.broadcast = broadcast;
+        this.network = network;
         this.vote = null;
         this.accept = null;
         this.acceptQuorum = null;
@@ -36,9 +38,19 @@ export class FBASInstance {
         this.state = new Map();
     }
 
+    broadcast(msg: VoteMessage | AcceptMessage | ConfirmMessage) {
+        this.network.send(msg.export());
+    }
+
     castVote(value: boolean) {
         this.vote = value;
         const msg = new VoteMessage(this.id, this.slices, this.topic, value);
+        this.updateState(this.id, (oldState: NodeState) => {
+            oldState.setSlices(this.slices);
+            oldState.setVote(value);
+            return oldState;
+        })
+        this.onStateUpdated();
         this.broadcast(msg);
     }
 
@@ -51,28 +63,49 @@ export class FBASInstance {
         }
     }
 
+    updateState(node: NodeIdentifier, updateFunction: (oldState: NodeState) => NodeState) {
+        const oldState = this.state.get(node);
+        const newState = oldState ? updateFunction(oldState) : updateFunction(new NodeState());
+        this.state.set(node, newState);
+    }
+
     handleVoteMessage(msg: VoteMessage) {
-        const nodeState = (this.state.has(msg.origin.pk)) ? this.state.get(msg.origin.pk)! : new NodeState(msg.slices);
-        nodeState.setVote(msg.value);
-        this.state.set(msg.origin.pk, nodeState);
+        this.updateState(msg.origin, (oldState: NodeState) => {
+            oldState.setVote(msg.value);
+            oldState.setSlices(msg.slices);
+            return oldState;
+        });
         this.onStateUpdated();
     }
 
     handleAcceptMessage(msg: AcceptMessage) {
-        const nodeState = (this.state.has(msg.origin.pk)) ? this.state.get(msg.origin.pk)! : new NodeState(msg.slices);
-        nodeState.setAccept(msg.value);
-        this.state.set(msg.origin.pk, nodeState);
+        this.updateState(msg.origin, (oldState: NodeState) => {
+            oldState.setAccept(msg.value);
+            oldState.setSlices(msg.slices);
+            return oldState;
+        });
         this.onStateUpdated();
     }
 
     handleConfirmMessage(msg: ConfirmMessage) {
-        const nodeState = (this.state.has(msg.origin.pk)) ? this.state.get(msg.origin.pk)! : new NodeState(msg.slices);
-        nodeState.setConfirm(msg.value);
-        this.state.set(msg.origin.pk, nodeState);
+        this.updateState(msg.origin, (oldState: NodeState) => {
+            oldState.setConfirm(msg.value);
+            oldState.setSlices(msg.slices);
+            return oldState;
+        });
         this.onStateUpdated();
     }
 
     onStateUpdated() {
-
+        console.log('state updated');
+        if (!this.vote) return;
+        const quorum = findQuorum(this.id, this.state, this.vote);
+        if (quorum) {
+            console.log(`Found a vote - quorum on topic ${this.topic.value} with value ${this.vote}`);
+            quorum.print();
+        }
+        else {
+            console.log('No quorum found so far.')
+        }
     }
 }

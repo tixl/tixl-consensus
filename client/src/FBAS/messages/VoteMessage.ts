@@ -1,5 +1,5 @@
 import Message from './Message';
-import NodeIdentifier from "../NodeIdentifier";
+import { NodeIdentifier } from "../NodeIdentifier";
 import Slices from '../Slice';
 import Topic from '../Topic';
 
@@ -15,7 +15,7 @@ export default class VoteMessage extends Message {
     export() {
         return {
             origin: this.origin,
-            slices: this.slices,
+            slices: this.slices.toArray(),
             topic: this.topic,
             value: this.value,
             type: this.type,
