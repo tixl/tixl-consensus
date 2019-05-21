@@ -62,7 +62,6 @@ const main = (name: string) => {
 
     socket.on('broadcast', (message: any) => {
         log('received message');
-        jlog(message);
         if (!message.type) {
             log('received message without type');
             return;
@@ -71,6 +70,7 @@ const main = (name: string) => {
             log('message from me, skipping')
             return;
         }
+        jlog(message);
         if (message.type === "VOTE") {
             const voteMsg = new VoteMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             const fbas = getFbasForTopic(message.topic.value);

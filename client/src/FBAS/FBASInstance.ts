@@ -50,8 +50,8 @@ export class FBASInstance {
             oldState.setVote(value);
             return oldState;
         })
-        this.onStateUpdated();
         this.broadcast(msg);
+        this.onStateUpdated();
     }
 
     receiveMessage(msg: VoteMessage | AcceptMessage | ConfirmMessage) {
