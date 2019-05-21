@@ -4,15 +4,30 @@ import { setDifference } from "./setDifference";
 import { isSuperset } from "./isSuperset";
 import Quorum from "../Quorum";
 
-export const findQuorum = (node: NodeIdentifier, state: InstanceState, value: boolean): Quorum | null => {
+export enum Phase {
+    ACCEPT = "ACCEPT",
+    CONFIRM = "CONFIRM"
+};
+
+export const findQuorum = (node: NodeIdentifier, state: InstanceState, value: boolean, phase: Phase): Quorum | null => {
 
     const nodeAgrees = (node: NodeIdentifier) => {
         const nodeState = state.get(node);
-        if (nodeState && (nodeState.vote || nodeState.confirm)) {
-            let nodeValue = nodeState.confirm || nodeState.vote;
-            if (nodeValue === value) return true;
+        if (phase === Phase.ACCEPT) {
+            if (nodeState && (nodeState.vote !== null || nodeState.accept !== null)) {
+                let nodeValue = (nodeState.accept !== null) ? nodeState.accept : nodeState.vote;
+                if (nodeValue === value) return true;
+            }
+            return false;
         }
-        return false;
+        // phase === confirm
+        else {
+            if (nodeState && nodeState.accept !== null) {
+                let nodeValue = nodeState.accept;
+                if (nodeValue === value) return true;
+            }
+            return false;
+        }
     }
 
     const nodesAgree = (nodes: Set<NodeIdentifier>) => {

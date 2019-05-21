@@ -6,7 +6,7 @@ import Quorum from './Quorum';
 import Slices from './Slice';
 import { NodeIdentifier } from './NodeIdentifier';
 import NodeState from './NodeState';
-import { findQuorum } from './helpers/findQuorum';
+import { findQuorum, Phase } from './helpers/findQuorum';
 import Network from '../Network';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
@@ -99,7 +99,7 @@ export class FBASInstance {
     onStateUpdated() {
         console.log('state updated');
         if (!this.vote) return;
-        const quorum = findQuorum(this.id, this.state, this.vote);
+        const quorum = findQuorum(this.id, this.state, this.vote, Phase.ACCEPT);
         if (quorum) {
             console.log(`Found a vote - quorum on topic ${this.topic.value} with value ${this.vote}`);
             quorum.print();
