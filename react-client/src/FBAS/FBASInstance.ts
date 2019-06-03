@@ -7,8 +7,9 @@ import Slices from './Slice';
 import { NodeIdentifier } from './NodeIdentifier';
 import NodeState from './NodeState';
 import { findQuorum, Phase } from './helpers/findQuorum';
-import Network from '../types/Network';
 import { findBlockingValues } from './helpers/findBlockingValues';
+import Network from '../types/Network';
+import uuid from 'uuid/v4';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
 
@@ -24,6 +25,7 @@ export class FBASInstance {
     id: NodeIdentifier; // My ID
     state: InstanceState;
     network: Network;
+    internalId: string;
 
     constructor(topic: Topic, id: NodeIdentifier, slices: Slices, network: Network) {
         this.topic = topic;
@@ -37,6 +39,7 @@ export class FBASInstance {
         this.confirmQuorum = null;
         this.log = [];
         this.state = new Map();
+        this.internalId = uuid();
     }
 
     broadcast(msg: VoteMessage | AcceptMessage | ConfirmMessage) {
@@ -67,6 +70,17 @@ export class FBASInstance {
         })
         this.broadcast(msg);
         this.onStateUpdated();
+    }
+
+    confirmValue(value: boolean) {
+        this.confirm = value;
+        const msg = new ConfirmMessage(this.id, this.slices, this.topic, value);
+        this.updateState(this.id, (oldState: NodeState) => {
+            oldState.setSlices(this.slices);
+            oldState.setConfirm(value);
+            return oldState;
+        })
+        this.broadcast(msg);
     }
 
     receiveMessage(msg: VoteMessage | AcceptMessage | ConfirmMessage) {
@@ -112,7 +126,8 @@ export class FBASInstance {
     }
 
     onStateUpdated() {
-        console.log('state updated');
+        console.log('state updated',this.internalId);
+        console.log(this)
         if (this.vote === null) return;
         if (this.vote !== null && this.accept === null) {
             const quorum = findQuorum(this.id, this.state, this.vote, Phase.ACCEPT);
@@ -136,11 +151,11 @@ export class FBASInstance {
                 }
             }
         }
-        else if (this.accept !== null) {
+        else if (this.accept !== null && this.confirm === null) {
             const quorum = findQuorum(this.id, this.state, this.accept, Phase.CONFIRM);
             if (quorum) {
                 console.log(`Found a accept - quorum on topic ${this.topic.value} with value ${this.accept}`);
-                this.acceptValue(this.vote);
+                this.confirmValue(this.accept);
                 quorum.print();
             } else {
                 console.log("No confirm quorum so far");

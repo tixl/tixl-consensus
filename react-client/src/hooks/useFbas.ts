@@ -8,78 +8,73 @@ import AcceptMessage from '../FBAS/messages/AcceptMessage';
 import ConfirmMessage from '../FBAS/messages/ConfirmMessage';
 import io from 'socket.io-client';
 
-export interface ReturnValues {
-    instances: FBASInstance[],
-    clientId: string;
-}
-
-export const useFbas = (): ReturnValues => {
+export const useFbas = () => {
+    console.log('usefbas')
     const [instances, setInstances] = useState<FBASInstance[]>([]);
     const [messageLog, setMessageLog] = useState<any[]>([]);
-    console.log('use fbas')
-
-
     const [clientId, setClientId] = useState<string>('');
-
     const [socket, setSocket] = useState<SocketIOClient.Socket>();
+    const [network, setNetwork] = useState<Network | null>(null);
 
     useEffect(() => {
-        console.log('use fbas socket effect')
-        const _socket = io('http://localhost:4242');
-        setSocket(_socket);
+        setSocket(io('http://localhost:4242'));
     }, [])
 
+    useEffect(() => {
+        socket && setNetwork(new Network((obj: any) => socket.emit('broadcast', obj)));
+    }, [socket])
 
     useEffect(() => {
-        console.log('use fbas effect')
-        if (!socket) return;
+        socket && socket.emit('register', {}, ({ name }: any) => setClientId(name))
+    }, [socket])
 
-        socket && socket.emit('register', {}, (ack: any) => {
-            setClientId(ack.name);
-        })
-
-        const network = new Network((obj: any) => socket.emit('broadcast', obj));
+    useEffect(() => {
+        if (!socket || !network) return;
 
         const getOrCreateInstance = (id: string) => {
             const instance = instances.find(x => x.topic.value === id);
             if (instance) return instance;
-            const newInstance = new FBASInstance(new Topic(id), clientId, new Slices(), network);
+            console.log('create new for ', id, 'existing', instances)
+            const newInstance = new FBASInstance(new Topic(id), clientId, Slices.fromSingleArray([id]), network);
             const newInstances = [...instances, newInstance];
+            console.log('newinstances', newInstances)
             setInstances(newInstances);
+            console.log('instances', instances)
             return newInstance;
         }
 
         socket.on('broadcast', (message: any) => {
-            if (!message.type) {
-                return;
-            }
-            console.log(message)
-            // if (message.origin === id) {
-            //     log('message from me, skipping')
-            //     return;
-            // }
+            if (!message.type || message.origin === clientId) return;
+            setMessageLog([...messageLog, message]);
+            let msg;
             if (message.type === "VOTE") {
-                const voteMsg = new VoteMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
-                const fbas = getOrCreateInstance(message.topic.value);
-                fbas.receiveMessage(voteMsg);
+                msg = new VoteMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             }
             if (message.type === 'ACCEPT') {
-                const acceptMsg = new AcceptMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
-                const fbas = getOrCreateInstance(message.topic.value);
-                fbas.receiveMessage(acceptMsg);
+                msg = new AcceptMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             }
             if (message.type === 'CONFIRM') {
-                const confirmMsg = new ConfirmMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
-                const fbas = getOrCreateInstance(message.topic.value);
-                fbas.receiveMessage(confirmMsg);
+                msg = new ConfirmMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             }
+            const fbas = getOrCreateInstance(message.topic.value);
+            if (!fbas || !msg) return;
+            fbas.receiveMessage(msg);
         });
-    }, [socket])
+        
+        return () => { }
 
+    }, [socket, clientId, network, instances, messageLog])
+
+    const startNewFBAS = (topic: string) => {
+        const instance = new FBASInstance(new Topic(topic), clientId, Slices.fromSingleArray([clientId]), network!);
+        instance.castVote(true);
+        setInstances([...instances, instance]);
+    }
 
 
     return {
         instances,
-        clientId
+        clientId,
+        startNewFBAS,
     }
 }

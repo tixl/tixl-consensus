@@ -10,7 +10,12 @@ export default class Slices {
         this.slices.add(slice);
     }
 
+    static fromSingleArray(slices: NodeIdentifier[]) {
+        return this.fromArray([slices]);
+    }
+
     static fromArray(slices: NodeIdentifier[][]) {
+        console.log(slices);
         return new Slices(new Set(slices.map(x => new Set(x))))
     }
 

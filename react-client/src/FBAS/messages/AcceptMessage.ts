@@ -15,7 +15,7 @@ export default class AcceptMessage extends Message {
     export() {
         return {
             origin: this.origin,
-            slices: this.slices,
+            slices: this.slices.toArray(),
             topic: this.topic,
             value: this.value,
             type: this.type,
