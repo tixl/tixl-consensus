@@ -1,52 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext, useMemo } from 'react';
 import { FBASInstance } from '../FBAS/FBASInstance';
 import Topic from '../FBAS/Topic';
-import Network from '../types/Network';
 import Slices from '../FBAS/Slice';
 import VoteMessage from '../FBAS/messages/VoteMessage';
 import AcceptMessage from '../FBAS/messages/AcceptMessage';
 import ConfirmMessage from '../FBAS/messages/ConfirmMessage';
-import io from 'socket.io-client';
+import { SocketContext, SocketContextTypes } from '../components/SocketContext';
 
 export const useFbas = () => {
     console.log('usefbas')
+    const { socket, network, clientId }: SocketContextTypes = useContext(SocketContext);
     const [instances, setInstances] = useState<FBASInstance[]>([]);
     const [messageLog, setMessageLog] = useState<any[]>([]);
-    const [clientId, setClientId] = useState<string>('');
-    const [socket, setSocket] = useState<SocketIOClient.Socket>();
-    const [network, setNetwork] = useState<Network | null>(null);
 
     useEffect(() => {
-        setSocket(io('http://localhost:4242'));
-    }, [])
-
-    useEffect(() => {
-        socket && setNetwork(new Network((obj: any) => socket.emit('broadcast', obj)));
-    }, [socket])
-
-    useEffect(() => {
-        socket && socket.emit('register', {}, ({ name }: any) => setClientId(name))
-    }, [socket])
-
-    useEffect(() => {
-        if (!socket || !network) return;
+        console.log('useEffect')
+        if (!socket || !network || !clientId) return;
 
         const getOrCreateInstance = (id: string) => {
             const instance = instances.find(x => x.topic.value === id);
             if (instance) return instance;
             console.log('create new for ', id, 'existing', instances)
             const newInstance = new FBASInstance(new Topic(id), clientId, Slices.fromSingleArray([id]), network);
-            const newInstances = [...instances, newInstance];
-            console.log('newinstances', newInstances)
-            setInstances(newInstances);
+            setInstances(oldInstances => [...oldInstances, newInstance]);
             console.log('instances', instances)
             return newInstance;
         }
 
-        socket.on('broadcast', (message: any) => {
+        const handler = (message: any) => {
             if (!message.type || message.origin === clientId) return;
-            setMessageLog([...messageLog, message]);
+            setMessageLog(oldMessages => [...oldMessages, message]);
             let msg;
+            if (!["VOTE", "ACCEPT", "CONFIRMS"].includes(message.type)) return;
             if (message.type === "VOTE") {
                 msg = new VoteMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             }
@@ -59,13 +44,18 @@ export const useFbas = () => {
             const fbas = getOrCreateInstance(message.topic.value);
             if (!fbas || !msg) return;
             fbas.receiveMessage(msg);
-        });
-        
-        return () => { }
+        }
 
-    }, [socket, clientId, network, instances, messageLog])
+        socket.on('broadcast', handler);
+
+        return () => {
+            socket.removeListener('broadcast', handler)
+        }
+
+    }, [socket, clientId, network])
 
     const startNewFBAS = (topic: string) => {
+        if (!socket || !network || !clientId) return;
         const instance = new FBASInstance(new Topic(topic), clientId, Slices.fromSingleArray([clientId]), network!);
         instance.castVote(true);
         setInstances([...instances, instance]);
@@ -74,7 +64,6 @@ export const useFbas = () => {
 
     return {
         instances,
-        clientId,
         startNewFBAS,
     }
 }
