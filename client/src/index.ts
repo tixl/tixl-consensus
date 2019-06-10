@@ -1,12 +1,13 @@
 import * as io from 'socket.io-client';
 import chalk from 'chalk';
-import Network from './Network';
+import Network from './types//Network';
 import { FBASInstance } from './FBAS/FBASInstance';
 import { NodeIdentifier } from './FBAS/NodeIdentifier';
 import Slices from './FBAS/Slice';
 import VoteMessage from './FBAS/messages/VoteMessage';
 import Topic from './FBAS/Topic';
 import AcceptMessage from './FBAS/messages/AcceptMessage';
+import ConfirmMessage from './FBAS/messages/ConfirmMessage';
 const readline = require('readline');
 const log = console.log;
 const jlog = (obj: any) => log(JSON.stringify(obj, null, 2));
@@ -80,6 +81,11 @@ const main = (name: string) => {
             const acceptMsg = new AcceptMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             const fbas = getFbasForTopic(message.topic.value);
             fbas.receiveMessage(acceptMsg);
+        }
+        if (message.type === 'CONFIRM') {
+            const confirmMsg = new ConfirmMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
+            const fbas = getFbasForTopic(message.topic.value);
+            fbas.receiveMessage(confirmMsg);
         }
     });
 

@@ -2,7 +2,6 @@ import { useState, useContext, useMemo, useEffect } from 'react';
 import { SocketContext, SocketContextTypes } from '../components/SocketContext';
 
 export const useClientDiscovery = () => {
-    console.log('useClientDiscovery')
     const { socket }: SocketContextTypes = useContext(SocketContext);
     const [knownClients, setKnownClients] = useState<string[]>([]);
 

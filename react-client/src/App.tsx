@@ -5,6 +5,7 @@ import { SocketContext } from './components/SocketContext';
 
 const App: React.FC = () => {
   const socketData = useSocket();
+  console.log('render app')
   return (
     <SocketContext.Provider value={{ ...socketData }}>
       <div className="w-screen h-screen bg-gray-200 p-8">

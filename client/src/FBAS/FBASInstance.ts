@@ -7,8 +7,8 @@ import Slices from './Slice';
 import { NodeIdentifier } from './NodeIdentifier';
 import NodeState from './NodeState';
 import { findQuorum, Phase } from './helpers/findQuorum';
-import Network from '../Network';
 import { findBlockingValues } from './helpers/findBlockingValues';
+import Network from '../types/Network';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
 
@@ -67,6 +67,17 @@ export class FBASInstance {
         })
         this.broadcast(msg);
         this.onStateUpdated();
+    }
+
+    confirmValue(value: boolean) {
+        this.confirm = value;
+        const msg = new ConfirmMessage(this.id, this.slices, this.topic, value);
+        this.updateState(this.id, (oldState: NodeState) => {
+            oldState.setSlices(this.slices);
+            oldState.setConfirm(value);
+            return oldState;
+        })
+        this.broadcast(msg);
     }
 
     receiveMessage(msg: VoteMessage | AcceptMessage | ConfirmMessage) {
@@ -134,6 +145,18 @@ export class FBASInstance {
                     console.log(`Found blocking set for value ${value} on topic ${this.topic}`);
                     this.acceptValue(value);
                 }
+            }
+        }
+        else if (this.accept !== null && this.confirm === null) {
+            debugger;
+            console.log('wtf')
+            const quorum = findQuorum(this.id, this.state, this.accept, Phase.CONFIRM);
+            if (quorum) {
+                console.log(`Found a accept - quorum on topic ${this.topic.value} with value ${this.accept}`);
+                this.confirmValue(this.accept);
+                quorum.print();
+            } else {
+                console.log("No confirm quorum so far");
             }
         }
 

@@ -11,7 +11,7 @@ export const useFbas = () => {
     console.log('usefbas')
     const { socket, network, clientId }: SocketContextTypes = useContext(SocketContext);
     const [instances, setInstances] = useState<FBASInstance[]>([]);
-    const [messageLog, setMessageLog] = useState<any[]>([]);
+    // const [messageLog, setMessageLog] = useState<any[]>([]);
 
     useEffect(() => {
         console.log('useEffect')
@@ -29,7 +29,7 @@ export const useFbas = () => {
 
         const handler = (message: any) => {
             if (!message.type || message.origin === clientId) return;
-            setMessageLog(oldMessages => [...oldMessages, message]);
+            // setMessageLog(oldMessages => [...oldMessages, message]);
             let msg;
             if (!["VOTE", "ACCEPT", "CONFIRMS"].includes(message.type)) return;
             if (message.type === "VOTE") {
@@ -52,7 +52,7 @@ export const useFbas = () => {
             socket.removeListener('broadcast', handler)
         }
 
-    }, [socket, clientId, network])
+    }, [socket, clientId, network, instances])
 
     const startNewFBAS = (topic: string) => {
         if (!socket || !network || !clientId) return;

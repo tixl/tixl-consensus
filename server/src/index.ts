@@ -7,6 +7,13 @@ const log = console.log;
 
 const server = http.createServer();
 const io = socketio(server);
+const nameToNode = new Map<string, Node>();
+
+setInterval(() => {
+    console.log('BROADCASTING KNOWN CLIENTS')
+    const clients = Array.from(nameToNode.values())
+    clients.forEach(client => client.send({ type: 'CLIENTS', clients: clients.map(x => x.name) }))
+}, 6000)
 
 io.on('connection', (socket) => {
     socket.on('register', ({ }, callback: any) => {
@@ -18,7 +25,6 @@ io.on('connection', (socket) => {
 server.listen(4242);
 log(chalk.bold.red('Simulation server on Port 4242'));
 
-const nameToNode = new Map<string, Node>();
 
 class Node {
     name: string;
@@ -58,6 +64,10 @@ class Node {
     removeKnownNode(node: Node) {
         this.trusts = this.trusts.filter(x => x.name !== node.name);
         node.trustedBy = node.trustedBy.filter(x => x.name !== this.name);
+    }
+
+    send(obj: any){
+        this.socket.emit('broadcast', obj)
     }
 
     broadcast(obj: any) {
