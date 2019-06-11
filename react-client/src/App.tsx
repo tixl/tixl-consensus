@@ -9,7 +9,7 @@ const App: React.FC = () => {
   return (
     <SocketContext.Provider value={{ ...socketData }}>
       <div className="w-screen h-screen bg-gray-200 p-8">
-        <h1 className="text-3xl mb-4">FBAS</h1>
+        <h1 className="text-3xl mb-4 font-thin">FBAS Test Client</h1>
         <FbasDisplay />
       </div>
     </SocketContext.Provider>

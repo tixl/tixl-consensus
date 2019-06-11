@@ -28,6 +28,7 @@ export class FBASInstance {
     internalId: string;
 
     constructor(topic: Topic, id: NodeIdentifier, slices: Slices, network: Network) {
+        console.log(slices);
         this.topic = topic;
         this.id = id;
         this.slices = slices;

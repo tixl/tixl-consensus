@@ -66,17 +66,18 @@ class Node {
         node.trustedBy = node.trustedBy.filter(x => x.name !== this.name);
     }
 
-    send(obj: any){
-        this.socket.emit('broadcast', obj)
+    send(obj: any) {
+        setTimeout(() => {
+            this.socket.emit('broadcast', obj)
+        }, 2000)
     }
 
     broadcast(obj: any) {
-        // this.trustedBy.forEach(node => {
-        //     node.socket.emit('broadcast', { by: this.name, msg });
-        // })
-        for (let node of nameToNode.values()) {
-            node.socket.emit('broadcast', obj);
-        }
+        setTimeout(() => {
+            for (let node of nameToNode.values()) {
+                node.socket.emit('broadcast', obj);
+            }
+        }, 2000)
     };
 
     addTrustedNodeByName(name: string): boolean {
