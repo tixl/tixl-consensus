@@ -1,9 +1,9 @@
 import React from 'react';
 import classnames from 'classnames';
 
-const Pill: React.FC<{ className?: string }> = ({ children, className }) => {
+const Pill: React.FC<{ className?: string, onClick?: any; }> = ({ children, className, onClick }) => {
     return (
-        <p className={classnames("inline-block rounded-full px-2 mr-2 text-sm", className)}>{children}</p>
+        <p onClick={onClick} className={classnames("inline-block rounded-full px-2 mr-2 text-sm", className, onClick && 'cursor-pointer')}>{children}</p>
     );
 }
 

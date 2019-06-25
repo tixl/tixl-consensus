@@ -7,17 +7,24 @@ import Slices from './Slice';
 import { NodeIdentifier } from './NodeIdentifier';
 import NodeState from './NodeState';
 import { findQuorum, Phase } from './helpers/findQuorum';
-import { findBlockingValues } from './helpers/findBlockingValues';
+import { getBlockingSet } from './helpers/getBlockingSet';
 import Network from '../types/Network';
 import uuid from 'uuid/v4';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
 
+export type BlockingSet = NodeIdentifier[][];
+
+export interface AcceptQuorumOrBlockingSet {
+    type: 'QUORUM' | 'BLOCKINGSET',
+    value: Quorum | BlockingSet
+}
+
 export class FBASInstance {
     topic: Topic;
     vote: boolean | null;
     accept: boolean | null;
-    acceptQuorum: Quorum | null;
+    acceptQuorum: null | AcceptQuorumOrBlockingSet;
     confirm: boolean | null;
     confirmQuorum: Quorum | null;
     log: (VoteMessage | AcceptMessage | ConfirmMessage)[];
@@ -28,7 +35,6 @@ export class FBASInstance {
     internalId: string;
 
     constructor(topic: Topic, id: NodeIdentifier, slices: Slices, network: Network) {
-        console.log(slices);
         this.topic = topic;
         this.id = id;
         this.slices = slices;
@@ -127,28 +133,34 @@ export class FBASInstance {
     }
 
     onStateUpdated() {
-        console.log('state updated',this.internalId);
+        console.log('state updated', this.internalId);
         console.log(this)
         if (this.vote === null) return;
         if (this.vote !== null && this.accept === null) {
+            // (1) There exists a quorum U such that v ∈ U and each member of U either voted for a or claims to accept a, or
             const quorum = findQuorum(this.id, this.state, this.vote, Phase.ACCEPT);
             if (quorum) {
                 console.log(`Found a vote - quorum on topic ${this.topic.value} with value ${this.vote}`);
                 this.acceptValue(this.vote);
+                this.acceptQuorum = {
+                    type: "QUORUM",
+                    value: quorum
+                }
                 quorum.print();
             }
             else {
-                const blockingValues = findBlockingValues(this.id, this.state);
-                if (blockingValues.length === 0) {
-                    console.log('No blocking values found')
+                const blockingSet = getBlockingSet(this.id, this.state);
+                if (blockingSet === null) {
+                    console.log('No blocking set found');
                 }
-                if (blockingValues.length === 2) {
-                    console.log('Contradicting blocking values found')
-                }
-                if (blockingValues.length === 1) {
-                    const value = blockingValues[0];
-                    console.log(`Found blocking set for value ${value} on topic ${this.topic}`);
-                    this.acceptValue(value);
+                else {
+                    // Each member of a v-blocking set claims to accept a.
+                    console.log(`Found blocking set for value ${blockingSet.value} on topic ${this.topic}`);
+                    this.acceptValue(blockingSet.value);
+                    this.acceptQuorum = {
+                        type: 'BLOCKINGSET',
+                        value: blockingSet.blockingSet
+                    }
                 }
             }
         }
@@ -157,6 +169,7 @@ export class FBASInstance {
             if (quorum) {
                 console.log(`Found a accept - quorum on topic ${this.topic.value} with value ${this.accept}`);
                 this.confirmValue(this.accept);
+                this.confirmQuorum = quorum;
                 quorum.print();
             } else {
                 console.log("No confirm quorum so far");

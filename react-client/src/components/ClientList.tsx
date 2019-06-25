@@ -37,7 +37,7 @@ const ClientList: React.FC<{ clients: string[], slices: Slices, setSlices: setSl
             })
         })
         if (changes) setSlices(_slices);
-    }, [slices, clients])
+    }, [slices, clients, clientId, setSlices])
 
     const ClientRow = ({ name }: { name: string }) => (
         <div className={classnames("flex p-1 pl-4", (name === clientId) && "bg-orange-200")}>
@@ -61,7 +61,7 @@ const ClientList: React.FC<{ clients: string[], slices: Slices, setSlices: setSl
 
                     </div>
                     <div className="flex-row">
-                        {clients.map(client => <ClientRow name={client} />)}
+                        {clients.map(client => <ClientRow key={client} name={client} />)}
                     </div>
                 </Fragment>
             ) :

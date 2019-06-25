@@ -1,4 +1,4 @@
-import { useState, useContext, useMemo, useEffect } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { SocketContext, SocketContextTypes } from '../components/SocketContext';
 
 export const useClientDiscovery = () => {

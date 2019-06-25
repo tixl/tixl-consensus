@@ -8,7 +8,7 @@ const App: React.FC = () => {
   console.log('render app')
   return (
     <SocketContext.Provider value={{ ...socketData }}>
-      <div className="w-screen h-screen bg-gray-200 p-8">
+      <div className="w-screen min-h-screen h-full bg-gray-200 p-8">
         <h1 className="text-3xl mb-4 font-thin">FBAS Test Client</h1>
         <FbasDisplay />
       </div>

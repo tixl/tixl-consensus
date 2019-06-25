@@ -13,11 +13,13 @@
     "react-dom": "^16.8.6",
     "react-scripts": "3.0.1",
     "socket.io-client": "^2.2.0",
+    "sweetalert-react": "^0.4.11",
     "typescript": "3.4.5",
     "use-socketio": "^1.0.1",
     "uuid": "^3.3.2"
   },
   "scripts": {
+    "test:ci": "CI=true react-scripts test",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "tailwind:css": "tailwind build src/css/tailwind.src.css -c  tailwind.js -o src/css/tailwind.css",

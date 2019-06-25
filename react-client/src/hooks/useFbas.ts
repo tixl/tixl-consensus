@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { FBASInstance } from '../FBAS/FBASInstance';
 import Topic from '../FBAS/Topic';
 import Slices from '../FBAS/Slice';
