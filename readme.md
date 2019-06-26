@@ -1,4 +1,4 @@
-# IMPORTANT
+# Note
 
 This should be considered a prototype which is WIP. The consensus algorithm is only one part of the Tixl core. We decided to make it open source because we don't see a significant risk of somebody stealing the code and using it for another privacy coin. You will see a lot of commits in this repository over the next weeks. We think that combined with the commit messages of the other repositories being pushed into Discord, a good overview of our technical progress is given.
 
