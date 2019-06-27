@@ -9,17 +9,20 @@ const server = http.createServer();
 const io = socketio(server);
 const nameToNode = new Map<string, Node>();
 
-setInterval(() => {
+const broadcastClients = () => {
     console.log('BROADCASTING KNOWN CLIENTS')
     const clients = Array.from(nameToNode.values())
     clients.forEach(client => client.send({ type: 'CLIENTS', clients: clients.map(x => x.name) }))
-}, 6000)
+}
+
+setInterval(broadcastClients, 30000)
 
 io.on('connection', (socket) => {
     socket.on('register', ({ }, callback: any) => {
         const client = new Node(socket);
         log(`New client: ${client.name}`);
         callback({ name: client.name });
+        broadcastClients();
     })
 });
 server.listen(4242);
@@ -58,6 +61,7 @@ class Node {
             log(chalk.red(`${this.name} disconnected`))
             this.trusts.forEach((node) => node.removeKnownNode(this));
             nameToNode.delete(this.name);
+            broadcastClients();
         })
     }
 
@@ -93,12 +97,3 @@ class Node {
         }
     }
 }
-
-setInterval(() => {
-    log('');
-    log(chalk.green('ACTIVE TRUSTS'))
-    for (let [, node] of nameToNode) {
-        log(`${node.name}: ${node.trusts.map(x => x.name)}`)
-    }
-    log('');
-}, 60000);
