@@ -10,6 +10,7 @@ import { findQuorum, Phase } from './helpers/findQuorum';
 import { getBlockingSet } from './helpers/getBlockingSet';
 import Network from '../types/Network';
 import uuid from 'uuid/v4';
+import { EventEmitter } from 'events';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
 
@@ -18,6 +19,12 @@ export type BlockingSet = NodeIdentifier[][];
 export interface AcceptQuorumOrBlockingSet {
     type: 'QUORUM' | 'BLOCKINGSET',
     value: Quorum | BlockingSet
+}
+
+export enum FBASEvents {
+    VOTE = "VOTE",
+    ACCEPT = "ACCEPT",
+    CONFIRM = "CONFIRM"
 }
 
 export class FBASInstance {
@@ -33,6 +40,7 @@ export class FBASInstance {
     state: InstanceState;
     network: Network;
     internalId: string;
+    eventEmitter: EventEmitter;
 
     constructor(topic: Topic, id: NodeIdentifier, slices: Slices, network: Network) {
         this.topic = topic;
@@ -47,7 +55,17 @@ export class FBASInstance {
         this.log = [];
         this.state = new Map();
         this.internalId = uuid();
+        this.eventEmitter = new EventEmitter();
     }
+
+    subscribe(event: FBASEvents, listener: (...args: any[]) => void) {
+        return this.eventEmitter.on(event, listener);
+    }
+
+    emit(event: FBASEvents, ...payload: any[]) {
+        return this.eventEmitter.emit(event, ...payload);
+    }
+
 
     broadcast(msg: VoteMessage | AcceptMessage | ConfirmMessage) {
         this.network.send(msg.export());
@@ -62,6 +80,7 @@ export class FBASInstance {
             oldState.setVote(value);
             return oldState;
         })
+        this.emit(FBASEvents.VOTE, { value })
         this.broadcast(msg);
         this.onStateUpdated();
     }
@@ -75,6 +94,7 @@ export class FBASInstance {
             oldState.setAccept(value);
             return oldState;
         })
+        this.emit(FBASEvents.ACCEPT, { value })
         this.broadcast(msg);
         this.onStateUpdated();
     }
@@ -87,6 +107,7 @@ export class FBASInstance {
             oldState.setConfirm(value);
             return oldState;
         })
+        this.emit(FBASEvents.CONFIRM, { value })
         this.broadcast(msg);
     }
 
