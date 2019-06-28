@@ -7,10 +7,13 @@ export default class Message {
     slices: Slices;
     topic: Topic;
     value: boolean;
-    constructor(origin: NodeIdentifier, slices: Slices, topic: Topic, value: boolean) {
+    slotId: number;
+    
+    constructor(origin: NodeIdentifier, slices: Slices, topic: Topic, value: boolean, slotId: number) {
         this.origin = origin;
         this.slices = slices;
         this.topic = topic;
         this.value = value;
+        this.slotId = slotId;
     }
 }

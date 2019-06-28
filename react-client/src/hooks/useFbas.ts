@@ -31,11 +31,11 @@ export const useFbas = (slices: UiSlices) => {
 
         const instanceSlices = transformSlices(slices);
 
-        const getOrCreateInstance = (id: string) => {
-            const instance = instances.find(x => x.topic.value === id);
+        const getOrCreateInstance = (id: string, value: any) => {
+            const instance = instances.find(x => x.topic.id === id);
             if (instance) return instance;
             console.log('create new for ', id, 'existing', instances)
-            const newInstance = new FBASInstance(new Topic({ id }), clientId, instanceSlices, network);
+            const newInstance = new FBASInstance(Topic.withId(value, id), clientId, instanceSlices, network);
             setInstances(oldInstances => [...oldInstances, newInstance]);
             console.log('instances', instances)
             return newInstance;
@@ -55,7 +55,7 @@ export const useFbas = (slices: UiSlices) => {
             if (message.type === 'CONFIRM') {
                 msg = new ConfirmMessage(message.origin, Slices.fromArray(message.slices), message.topic, message.value);
             }
-            const fbas = getOrCreateInstance(message.topic.value);
+            const fbas = getOrCreateInstance(message.topic.id, message.topic.value);
             if (!fbas || !msg) return;
             fbas.receiveMessage(msg);
         }
@@ -70,7 +70,7 @@ export const useFbas = (slices: UiSlices) => {
 
     const startNewFBAS = (topic: string) => {
         if (!socket || !network || !clientId) return;
-        const instance = new FBASInstance(new Topic({ id: topic }), clientId, transformSlices(slices), network!);
+        const instance = new FBASInstance(Topic.autoId(topic), clientId, transformSlices(slices), network!);
         instance.castVote(true);
         setInstances([...instances, instance]);
     }

@@ -7,8 +7,8 @@ type VOTE = "VOTE";
 
 export default class VoteMessage extends Message {
     type: VOTE;
-    constructor(origin: NodeIdentifier, slices: Slices, topic: Topic, value: boolean) {
-        super(origin, slices, topic, value);
+    constructor(origin: NodeIdentifier, slices: Slices, topic: Topic, value: boolean, slotId: number) {
+        super(origin, slices, topic, value, slotId);
         this.type = "VOTE";
     }
 
@@ -16,7 +16,7 @@ export default class VoteMessage extends Message {
         return {
             origin: this.origin,
             slices: this.slices.toArray(),
-            topic: this.topic,
+            topic: this.topic.export(),
             value: this.value,
             type: this.type,
         }

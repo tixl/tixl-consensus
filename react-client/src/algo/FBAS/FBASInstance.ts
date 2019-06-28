@@ -41,8 +41,9 @@ export class FBASInstance {
     network: Network;
     internalId: string;
     eventEmitter: EventEmitter;
+    slotId: number;
 
-    constructor(topic: Topic, id: NodeIdentifier, slices: Slices, network: Network) {
+    constructor(topic: Topic, id: NodeIdentifier, slices: Slices, network: Network, slotId: number) {
         this.topic = topic;
         this.id = id;
         this.slices = slices;
@@ -56,6 +57,7 @@ export class FBASInstance {
         this.state = new Map();
         this.internalId = uuid();
         this.eventEmitter = new EventEmitter();
+        this.slotId = slotId;
     }
 
     subscribe(event: FBASEvents, listener: (...args: any[]) => void) {
@@ -72,9 +74,10 @@ export class FBASInstance {
     }
 
     castVote(value: boolean) {
+        if(this.vote !== null) return;
         console.log(`Vote value ${value} for topic ${this.topic.value}`);
         this.vote = value;
-        const msg = new VoteMessage(this.id, this.slices, this.topic, value);
+        const msg = new VoteMessage(this.id, this.slices, this.topic, value, this.slotId);
         this.updateState(this.id, (oldState: NodeState) => {
             oldState.setSlices(this.slices);
             oldState.setVote(value);
@@ -86,9 +89,10 @@ export class FBASInstance {
     }
 
     acceptValue(value: boolean) {
+        if(this.accept !== null) return;
         console.log(`Accept value ${value} for topic ${this.topic.value}`);
         this.accept = value;
-        const msg = new AcceptMessage(this.id, this.slices, this.topic, value);
+        const msg = new AcceptMessage(this.id, this.slices, this.topic, value, this.slotId);
         this.updateState(this.id, (oldState: NodeState) => {
             oldState.setSlices(this.slices);
             oldState.setAccept(value);
@@ -100,8 +104,9 @@ export class FBASInstance {
     }
 
     confirmValue(value: boolean) {
+        if(this.confirm !== null) return;
         this.confirm = value;
-        const msg = new ConfirmMessage(this.id, this.slices, this.topic, value);
+        const msg = new ConfirmMessage(this.id, this.slices, this.topic, value, this.slotId);
         this.updateState(this.id, (oldState: NodeState) => {
             oldState.setSlices(this.slices);
             oldState.setConfirm(value);

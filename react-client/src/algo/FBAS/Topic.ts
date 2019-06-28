@@ -2,18 +2,26 @@ import uuid from 'uuid/v4';
 
 
 export default class Topic {
-    value: Object;
+    value: any;
     id: string
-    constructor(value: Object) {
+    constructor(value: any, id: string) {
         this.value = value;
-        this.id = uuid();
+        this.id = id;
+    }
+
+    static withId(value: any, id: string) {
+        return new Topic(value, id);
+    }
+
+    static autoId(value: any) {
+        return new Topic(value, uuid());
     }
 
     export() {
-        return this.value;
+        return { value: this.value, id: this.id }
     }
 
-    toString(){
+    toString() {
         return JSON.stringify(this.value);
     }
 }

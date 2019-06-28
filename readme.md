@@ -8,6 +8,9 @@ This repository currently implements a simulation of the Federated Byzantine Agr
 If you want to understand the basics of FBAS please read our [Medium article](https://medium.com/tixlcurrency/federated-byzantine-agreement-system-and-tixl-c60254ea2439).
 
 ## Running locally
+As this is WIP and we're working on the master branch we would suggest you to use commit b20658a to test FBAS locally.
+
+- git checkout b20658a7f80c4fda4e5c15aed60b01707d4691f4
 - `yarn` in both folders
 - `yarn start` in both folders
 
