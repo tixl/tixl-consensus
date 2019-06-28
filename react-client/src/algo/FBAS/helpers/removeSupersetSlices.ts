@@ -1,4 +1,4 @@
-import Slices from '../Slice';
+import Slices from '../../common/Slices';
 import { isSuperset } from './isSuperset';
 
 export const removeSupersetSlices = (slicesObj: Slices): Slices => {

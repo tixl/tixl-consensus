@@ -1,4 +1,4 @@
-import { NodeIdentifier } from "../NodeIdentifier";
+import { NodeIdentifier } from "../../common/NodeIdentifier";
 import { InstanceState } from "../FBASInstance";
 
 export const findBlockingValues = (node: NodeIdentifier, state: InstanceState) => {

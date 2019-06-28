@@ -3,12 +3,12 @@ import ConfirmMessage from './messages/ConfirmMessage';
 import AcceptMessage from './messages/AcceptMessage';
 import Topic from './Topic';
 import Quorum from './Quorum';
-import Slices from './Slice';
-import { NodeIdentifier } from './NodeIdentifier';
+import Slices from '../common/Slices';
+import { NodeIdentifier } from '../common/NodeIdentifier';
 import NodeState from './NodeState';
 import { findQuorum, Phase } from './helpers/findQuorum';
 import { getBlockingSet } from './helpers/getBlockingSet';
-import Network from '../types/Network';
+import Network from '../common/Network';
 import uuid from 'uuid/v4';
 import { EventEmitter } from 'events';
 

@@ -1,5 +1,5 @@
 import 'jest';
-import Slices from '../Slice';
+import Slices from '../../common/Slices';
 import { removeSupersetSlices } from './removeSupersetSlices';
 
 describe('removeSupersetSlices', () => {

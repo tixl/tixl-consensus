@@ -1,5 +1,5 @@
 import {createContext} from 'react';
-import Network from '../types/Network';
+import Network from '../algo/common/Network';
 
 export interface SocketContextTypes {
     socket: SocketIOClient.Socket | null;

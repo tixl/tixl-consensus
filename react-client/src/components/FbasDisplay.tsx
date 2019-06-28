@@ -15,7 +15,7 @@ const FbasDisplay: React.FC = () => {
             <ClientList clients={knownClients} setSlices={setSlices} slices={slices} />
             <StartNewFbas startNewFbasHandler={startNewFBAS}/>
             <h2 className="ml-4 text-xl font-thin">FBAS Instances</h2>
-            {instances.map((instance) => <FbasInstanceView instance={instance} key={instance.topic.value} />)}
+            {instances.map((instance) => <FbasInstanceView instance={instance} key={instance.topic.id} />)}
 
         </div>
     )

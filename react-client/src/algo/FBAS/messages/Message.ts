@@ -1,5 +1,5 @@
-import { NodeIdentifier } from "../NodeIdentifier";
-import Slices from '../Slice';
+import { NodeIdentifier } from "../../common/NodeIdentifier";
+import Slices from '../../common/Slices';
 import Topic from '../Topic';
 
 export default class Message {

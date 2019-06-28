@@ -1,8 +1,8 @@
 import Pill from '../Pill';
-import Quorum from '../../FBAS/Quorum';
+import Quorum from '../../algo/FBAS/Quorum';
 import React from 'react';
 import { arrayToString } from './arrayToString';
-import { FBASInstance } from '../../FBAS/FBASInstance';
+import { FBASInstance } from '../../algo/FBAS/FBASInstance';
 
 const ConfirmedBy: React.FC<{ instance: FBASInstance }> = ({ instance }) => {
     return instance.confirmQuorum !== null ? (

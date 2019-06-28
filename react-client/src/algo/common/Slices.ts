@@ -15,7 +15,6 @@ export default class Slices {
     }
 
     static fromArray(slices: NodeIdentifier[][]) {
-        console.log(slices);
         return new Slices(new Set(slices.map(x => new Set(x))))
     }
 

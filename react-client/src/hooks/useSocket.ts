@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import Network from '../types/Network';
+import Network from '../algo/common/Network';
 import io from 'socket.io-client';
 
 export const useSocket = () => {

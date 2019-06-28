@@ -1,4 +1,4 @@
-import Slices from './Slice';
+import Slices from '../common/Slices';
 
 export default class NodeState {
     vote: boolean | null;

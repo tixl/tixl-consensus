@@ -1,5 +1,5 @@
 import { InstanceState } from "../FBASInstance";
-import { NodeIdentifier } from "../NodeIdentifier";
+import { NodeIdentifier } from "../../common/NodeIdentifier";
 import { setDifference } from "./setDifference";
 import { isSuperset } from "./isSuperset";
 import Quorum from "../Quorum";

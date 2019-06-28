@@ -1,6 +1,6 @@
 import 'jest';
-import Slices from '../Slice';
-import { NodeIdentifier } from '../NodeIdentifier';
+import Slices from '../../common/Slices';
+import { NodeIdentifier } from '../../common/NodeIdentifier';
 import NodeState from '../NodeState';
 import { findBlockingValues, getBlockingSet } from './getBlockingSet';
 

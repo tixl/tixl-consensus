@@ -1,4 +1,4 @@
-import { NodeIdentifier } from "./NodeIdentifier";
+import { NodeIdentifier } from "../common/NodeIdentifier";
 
 export default class Quorum {
     nodes: Set<NodeIdentifier>;

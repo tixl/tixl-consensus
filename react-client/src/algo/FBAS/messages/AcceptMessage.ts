@@ -1,15 +1,15 @@
 import Message from './Message';
-import { NodeIdentifier } from "../NodeIdentifier";
-import Slices from '../Slice';
+import { NodeIdentifier } from "../../common/NodeIdentifier";
+import Slices from '../../common/Slices';
 import Topic from '../Topic';
 
-type CONFIRM = "CONFIRM";
+type ACCEPT = "ACCEPT";
 
-export default class ConfirmMessage extends Message {
-    type: CONFIRM;
+export default class AcceptMessage extends Message {
+    type: ACCEPT;
     constructor(origin: NodeIdentifier, slices: Slices, topic: Topic, value: boolean) {
         super(origin, slices, topic, value);
-        this.type = "CONFIRM";
+        this.type = "ACCEPT";
     }
 
     export() {

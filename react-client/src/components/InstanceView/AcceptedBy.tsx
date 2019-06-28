@@ -1,7 +1,7 @@
 import React from 'react';
-import { FBASInstance } from '../../FBAS/FBASInstance';
+import { FBASInstance } from '../../algo/FBAS/FBASInstance';
 import Pill from '../Pill';
-import Quorum from '../../FBAS/Quorum';
+import Quorum from '../../algo/FBAS/Quorum';
 import { arrayToString } from './arrayToString';
 
 const AcceptedBy: React.FC<{ instance: FBASInstance }> = ({ instance }) => {

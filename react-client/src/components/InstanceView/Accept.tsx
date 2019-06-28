@@ -1,5 +1,5 @@
 import React from 'react';
-import { FBASInstance } from '../../FBAS/FBASInstance';
+import { FBASInstance } from '../../algo/FBAS/FBASInstance';
 import Pill from '../Pill';
 import { instanceValueToString } from './instanceValueToString';
 
