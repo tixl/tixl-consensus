@@ -1,15 +1,11 @@
 import 'jest';
-import Slices from '../../common/Slices';
-import { NodeIdentifier } from '../../common/NodeIdentifier';
-import NodeState from '../NodeState';
+import { NodeState } from '../NodeState';
 import { findQuorum, Phase } from './findQuorum';
 
 const NI = (label: string) => label;
-const SL = (slices: NodeIdentifier[][]) =>
-    new Slices(new Set(slices.map(slice => new Set(slice))));
-const ST = (val: boolean, slices: Slices) => {
-    const state = new NodeState(slices);
-    state.setVote(val);
+const SL = (slices: string[][]) => slices
+const ST = (val: boolean, slices: string[][]) => {
+    const state: NodeState = {vote: val, accept: null, confirm: null, slices};
     return state;
 }
 describe('findQuorum', () => {
@@ -40,9 +36,9 @@ describe('findQuorum', () => {
         state.set(e, eState);
         const result = findQuorum(a, state, true, Phase.ACCEPT);
 
-        const expected = new Set([a, b, c, d]);
+        const expected = [a, b, c, d];
 
-        expect(result!.nodes).toEqual(expected);
+        expect(result).toEqual(expected);
 
     })
 
@@ -73,9 +69,9 @@ describe('findQuorum', () => {
         state.set(e, eState);
         const result = findQuorum(a, state, true, Phase.ACCEPT);
 
-        const expected = new Set([a, b, c, d]);
+        const expected = [a, b, c, d];
 
-        expect(result!.nodes).toEqual(expected);
+        expect(result).toEqual(expected);
 
     })
 

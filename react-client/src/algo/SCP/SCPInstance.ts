@@ -6,7 +6,6 @@ import Network from "../common/Network";
 import crypto from 'crypto';
 import { toBigIntBE } from 'bigint-buffer';
 import { FBASInstance, FBASEvents } from '../FBAS/FBASInstance';
-import Topic from '../FBAS/Topic';
 import { EventEmitter } from 'events';
 
 const sha256 = (input: string): bigint => toBigIntBE(crypto.createHash('sha256').update(input, 'utf8'));

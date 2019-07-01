@@ -1,21 +1,17 @@
 import uuid from "uuid/v4";
 
-export default class Transaction {
-    id: string;
-    from: string;
-    to: string;
-    timestamp: number;
-    amount: number;
-
-    constructor(from: string, to: string, amount: number) {
-        this.timestamp = Date.now();
-        this.from = from;
-        this.to = to;
-        this.amount = amount;
-        this.id = uuid();
-    }
-
-    isValid() {
-        return this.timestamp <= Date.now()
-    }
+export interface TransactionArgs {
+    from: string,
+    to: string,
+    id?: string,
+    amount: number,
+    timestamp?: number,
 }
+
+export const Transaction = ({ id, from, to, timestamp, amount }: TransactionArgs) => ({
+    from,
+    to,
+    amount,
+    timestamp: timestamp || Date.now(),
+    id: id || uuid()
+})

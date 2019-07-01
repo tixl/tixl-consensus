@@ -1,16 +1,13 @@
 import 'jest';
 import Slices from '../../common/Slices';
 import { NodeIdentifier } from '../../common/NodeIdentifier';
-import NodeState from '../NodeState';
 import { findBlockingValues, getBlockingSet } from './getBlockingSet';
+import { NodeState } from '../NodeState';
 
 const NI = (label: string) => label;
-const SL = (slices: NodeIdentifier[][]) =>
-    new Slices(new Set(slices.map(slice => new Set(slice))));
-const ST = (val: boolean, slices: Slices) => {
-    const state = new NodeState(slices);
-    state.setVote(val);
-    state.setAccept(val);
+const SL = (slices: string[][]) => slices;
+const ST = (val: boolean, slices: string[][]) => {
+    const state: NodeState = {slices, vote: val, accept: val, confirm: null};
     return state;
 }
 describe('findBlockingValues', () => {
