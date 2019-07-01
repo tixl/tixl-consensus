@@ -3,9 +3,9 @@ import { FBASInstance } from '../algo/FBAS/FBASInstance';
 import Topic from '../algo/FBAS/Topic';
 import Slices from '../algo/common/Slices';
 import { Slices as UiSlices } from '../components/ClientList';
-import VoteMessage from '../algo/FBAS/messages/VoteMessage';
-import AcceptMessage from '../algo/FBAS/messages/AcceptMessage';
-import ConfirmMessage from '../algo/FBAS/messages/ConfirmMessage';
+import VoteMessage from '../algo/common/messages/VoteMessage';
+import AcceptMessage from '../algo/common/messages/AcceptMessage';
+import ConfirmMessage from '../algo/common/messages/ConfirmMessage';
 import { SocketContext, SocketContextTypes } from '../components/SocketContext';
 
 export const useFbas = (slices: UiSlices) => {

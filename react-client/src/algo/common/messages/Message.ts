@@ -1,4 +1,4 @@
-import { VotingType } from "../FBASInstance";
+import { VotingType } from "../../FBAS/FBASInstance";
 
 export enum MessageStage {
     'VOTE' = 'VOTE',

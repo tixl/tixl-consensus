@@ -15,3 +15,5 @@ export const Transaction = ({ id, from, to, timestamp, amount }: TransactionArgs
     timestamp: timestamp || Date.now(),
     id: id || uuid()
 })
+
+export type TransactionReturnType = ReturnType<typeof Transaction>;

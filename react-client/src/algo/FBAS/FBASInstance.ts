@@ -5,7 +5,8 @@ import { getBlockingSet } from './helpers/getBlockingSet';
 import Network from '../common/Network';
 import uuid from 'uuid/v4';
 import { EventEmitter } from 'events';
-import { MessageReturnType, Message, MessageStage } from './messages/Message';
+import { MessageReturnType, Message, MessageStage } from '../common/messages/Message';
+import { NominatePayload } from '../common/messages/NominateMessage';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
 
@@ -27,7 +28,7 @@ export enum VotingType {
 }
 
 export class FBASInstance {
-    id: string;
+    votingId: string;
     vote: boolean | null;
     accept: boolean | null;
     confirm: boolean | null;
@@ -40,9 +41,10 @@ export class FBASInstance {
     eventEmitter: EventEmitter;
     slotId: number;
     votingType: VotingType;
+    messagePayload: null | NominatePayload;
 
-    constructor(id: string, nodeId: string, slices: string[][], network: Network, slotId: number, votingType: VotingType) {
-        this.id = id;
+    constructor(votingId: string, nodeId: string, slices: string[][], network: Network, slotId: number, votingType: VotingType, messagePayload?: NominatePayload) {
+        this.votingId = votingId;
         this.nodeId = nodeId;
         this.slices = slices;
         this.network = network;
@@ -53,6 +55,7 @@ export class FBASInstance {
         this.confirmQuorum = null;
         this.slotId = slotId;
         this.votingType = votingType;
+        this.messagePayload = messagePayload || null;
         this.state = new Map();
         this.eventEmitter = new EventEmitter();
     }
@@ -61,8 +64,8 @@ export class FBASInstance {
         return this.eventEmitter.on("CONFIRM", listener);
     }
 
-    emitConfirm() {
-        return this.eventEmitter.emit("CONFIRM");
+    emitConfirm(value: boolean) {
+        return this.eventEmitter.emit("CONFIRM", { value });
     }
 
     broadcast(msg: MessageReturnType) {
@@ -71,7 +74,7 @@ export class FBASInstance {
 
     createMessage(stage: MessageStage, value: boolean) {
         return Message({
-            votingId: this.id,
+            votingId: this.votingId,
             votingType: this.votingType,
             slices: this.slices,
             senderId: this.nodeId,
@@ -104,7 +107,7 @@ export class FBASInstance {
         this.confirm = value;
         const msg = this.createMessage(MessageStage.CONFIRM, value);
         this.updateState(this.nodeId, (oldState: NodeState) => ({ ...oldState, confirm: value, slices: this.slices }));
-        this.emitConfirm();
+        this.emitConfirm(value);
         this.broadcast(msg);
     }
 

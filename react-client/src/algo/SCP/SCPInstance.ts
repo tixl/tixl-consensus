@@ -1,24 +1,20 @@
 import uuid from "uuid/v4";
-import TransactionSet from './TransactionSet';
-import Slices from '../common/Slices';
-import { NodeIdentifier } from "../common/NodeIdentifier";
 import Network from "../common/Network";
-import crypto from 'crypto';
-import { toBigIntBE } from 'bigint-buffer';
-import { FBASInstance, FBASEvents } from '../FBAS/FBASInstance';
+import { Message, MessageReturnType } from "../common/messages/Message";
+import { FBASInstance, FBASEvents, VotingType } from '../FBAS/FBASInstance';
 import { EventEmitter } from 'events';
-
-const sha256 = (input: string): bigint => toBigIntBE(crypto.createHash('sha256').update(input, 'utf8'));
-const hmax = BigInt(2) ** BigInt(256);
+import { NominateMessageReturnType, NominatePayload } from "../common/messages/NominateMessage";
+import { Transaction, TransactionReturnType } from "./Transaction";
+import { selectLeader } from "./selectLeader";
 
 export default class SCPInstance {
-    myNodeId: string;
+    nodeId: string;
     scpId: string;
     slotId: number;
-    quorumSlices: Slices;
-    suggestedTransactions: TransactionSet | null; // not yet voted for
-    confirmedNominations: TransactionSet[];
-    leaders: NodeIdentifier[];
+    quorumSlices: string[][];
+    suggestedTransactions: TransactionReturnType[] | null; // not yet voted for
+    confirmedNominations: TransactionReturnType[][];
+    leaders: string[];
     ballotNumber: number;
     leaderSelectionRound: number;
     network: Network;
@@ -26,8 +22,8 @@ export default class SCPInstance {
     eventEmitter: EventEmitter;
     fbasMap: Map<string, FBASInstance>;
 
-    constructor(myNodeId: string, slotId: number, slices: Slices, network: Network) {
-        this.myNodeId = myNodeId;
+    constructor(nodeId: string, slotId: number, slices: string[][], network: Network) {
+        this.nodeId = nodeId;
         this.quorumSlices = slices;
         this.leaders = []
         this.suggestedTransactions = null;
@@ -40,40 +36,35 @@ export default class SCPInstance {
         this.hasNominatedOwnValues = false;
         this.eventEmitter = new EventEmitter();
         this.fbasMap = new Map();
-
     }
 
-    setSuggestedTransactions(transactionSet: TransactionSet) {
-        this.suggestedTransactions = transactionSet;
+    setSuggestedTransactions(transactions: TransactionReturnType[]) {
+        this.suggestedTransactions = transactions;
     }
 
-    receiveMessage(message: any) {
-        if (!message.slotId) { console.log('Message is missing slotId') }
-        if (!message.topic || !message.topic.id) { console.log('Message has no topic id') };
+    receiveMessage(msg: MessageReturnType) {
         let fbas;
-        if (this.fbasMap.has(message.topic.id)) fbas = this.fbasMap.get(message.topic.id)!;
+        if (this.fbasMap.has(msg.votingId)) fbas = this.fbasMap.get(msg.votingId)!;
         else {
-            fbas = new FBASInstance(Topic.withId(message.topic.value, message.topic.id), this.myNodeId, this.quorumSlices, this.network, this.slotId);
-            this.fbasMap.set(message.topic.id, fbas);
-            switch (message.topic.type) {
-                case "NOMINATE": this.handleNominateMessage(message, fbas); break;
-                default: console.log('unsupported message topic type')
-            }
-            // set subscribers
+            fbas = new FBASInstance(msg.votingId, this.nodeId, this.quorumSlices, this.network, this.slotId, msg.votingType)
+            this.fbasMap.set(msg.votingId, fbas);
+            // TODO set subscribers
         }
-        fbas.receiveMessage(message);
+        fbas.receiveMessage(msg);
+        switch (msg.votingType) {
+            case VotingType.NOMINATE: this.handleNominateMessage(msg, fbas); break;
+        }
     }
 
-    handleNominateMessage(message: any, fbas: FBASInstance) {
+    handleNominateMessage(msg: NominateMessageReturnType, fbas: FBASInstance) {
         // from a leader
-        if (this.leaders.includes(message.origin)) {
-            // only vote if 
-            if (this.confirmedNominations.length === 0) {
-                fbas.castVote(true);
-            }
-            fbas.subscribe(FBASEvents.CONFIRM, this.onNominateConfirm(message.topic))
-
+        // if (this.leaders.includes(msg.senderId)) {
+        // only vote if nothing confirmed so far
+        if (this.confirmedNominations.length === 0) {
+            fbas.castVote(true);
         }
+        fbas.subscribeConfirm(this.onNominateConfirm(fbas))
+        // }
     }
 
     run() {
@@ -89,11 +80,12 @@ export default class SCPInstance {
         //  
     }
 
-    onNominateConfirm(topic: any) {
+    onNominateConfirm(fbas: FBASInstance) {
         return ({ value }: { value: boolean }) => {
             if (value !== true) return;
-            this.confirmedNominations.push(topic.value.transactions as any);
-            console.log('Nomination confirmed for ', topic.value.transactions)
+            const transactions = fbas.messagePayload!.transactions
+            this.confirmedNominations.push(transactions);
+            console.log('Nomination confirmed for ', fbas.votingId)
         }
     }
 
@@ -102,82 +94,27 @@ export default class SCPInstance {
             console.log('already nominated values');
             return;
         }
-        if (this.leaders.includes(this.myNodeId)) {
+        if (this.leaders.includes(this.nodeId)) {
             if (this.suggestedTransactions === null) { console.log('no transactions'); return; }
-            const topicValue = {
-                type: "NOMINATE",
-                transactions: this.suggestedTransactions,
-                slotId: this.slotId,
-            }
-            const topic = Topic.autoId(topicValue)
-            const fbas = new FBASInstance(topic, this.myNodeId, this.quorumSlices, this.network, this.slotId);
-            this.fbasMap.set(fbas.topic.id, fbas);
+            const payload: NominatePayload = { transactions: this.suggestedTransactions };
+            const fbas = new FBASInstance(uuid(), this.nodeId, this.quorumSlices, this.network, this.slotId, VotingType.NOMINATE, payload);
+            fbas.castVote(true);
+            this.fbasMap.set(fbas.votingId, fbas);
             this.hasNominatedOwnValues = true;
-            fbas.subscribe(FBASEvents.CONFIRM, this.onNominateConfirm(topic.export()))
-
+            fbas.subscribeConfirm(this.onNominateConfirm(fbas))
         } else {
             console.log('Do not nominate anything, because not a leader')
         }
     }
 
-    getNodeSliceCount() {
-        const slices = this.quorumSlices.toArray();
-        const nodeSliceCount: Map<NodeIdentifier, number> = new Map();
-        slices.forEach(slice => slice.forEach(node => {
-            if (nodeSliceCount.has(node)) nodeSliceCount.set(node, nodeSliceCount.get(node)! + 1)
-            else nodeSliceCount.set(node, 1);
-        }))
-        return nodeSliceCount;
-    }
 
     addNewLeader() {
-        const newLeader = this.selectLeader(this.leaderSelectionRound)
+        const newLeader = selectLeader(this.leaderSelectionRound, this.slotId, this.ballotNumber, this.quorumSlices);
         this.leaderSelectionRound++;
         if (!this.leaders.includes(newLeader)) {
             this.leaders.push(newLeader);
         }
         console.log('New leader added ', newLeader)
-    }
-
-    selectLeader(round: number) {
-        const isTimeout = false;
-        const hX = (i: number) => (m: string) => sha256([String(i), String(this.slotId), String(isTimeout ? this.ballotNumber : 0), String(round), m].join(''))
-        const h0 = hX(0);
-        const h1 = hX(1);
-        const nodeSliceCount = this.getNodeSliceCount();
-        const amountSlices = this.quorumSlices.toArray().length;
-        const nodes = [...nodeSliceCount.keys()];
-        const neighbors = nodes.filter(node => {
-            const weightX1000 = BigInt(nodeSliceCount.get(node)! / amountSlices * 1000);
-            const weightedMax = hmax / BigInt(1000) * weightX1000
-            return (h0(node) < weightedMax);
-        });
-        if (neighbors.length) {
-            let highestPrio: bigint = BigInt(0);
-            let leader = neighbors[0]
-            neighbors.forEach(node => {
-                const prio = h1(node);
-                if (prio > highestPrio) {
-                    highestPrio = prio;
-                    leader = node;
-                }
-            })
-            return leader;
-        }
-        else {
-            let lowestValue = hmax;
-            let selectedNode = nodes[0];
-            nodes.forEach(node => {
-                const weightX1000 = BigInt(nodeSliceCount.get(node)! / amountSlices * 1000);
-                const value = h0(node) / weightX1000 / BigInt(1000);
-                if (value < lowestValue) {
-                    lowestValue = value;
-                    selectedNode = node;
-                }
-            })
-            return selectedNode;
-        }
-
     }
 
 }
