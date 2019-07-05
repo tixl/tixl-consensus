@@ -35,6 +35,7 @@ export interface BaseMessageEnvelope {
     message: ScpNominate | ScpOther
     type: "ScpNominate" | "ScpOther"
     sender: PublicKey
+    slices: ScpSlices
 }
 
 export interface ScpNominateEnvelope extends BaseMessageEnvelope {

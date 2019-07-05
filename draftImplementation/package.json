@@ -1,19 +1,23 @@
 {
   "dependencies": {
     "bigint-buffer": "^1.1.2",
+    "chalk": "^2.4.2",
     "jest": "^24.8.0",
     "lodash": "^4.17.11",
     "toml": "^3.0.0",
     "uuid": "^3.3.2"
   },
   "scripts": {
-    "start": "ts-node src/index.ts"
+    "start": "ts-node src/index.ts",
+    "test": "jest"
   },
   "devDependencies": {
+    "@types/chalk": "^2.2.0",
     "@types/jest": "^24.0.15",
     "@types/lodash": "^4.14.135",
     "@types/node": "^12.0.12",
     "@types/uuid": "^3.4.5",
+    "ts-jest": "^24.0.2",
     "ts-node": "^8.3.0",
     "typescript": "^3.5.2"
   }

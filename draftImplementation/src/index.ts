@@ -3,8 +3,9 @@ import fs = require('fs');
 import { EventEmitter } from 'events';
 import { BroadcastFunction, protocol } from './protocol';
 import { MessageEnvelope, ScpSlices } from './types';
-import * as uuid from 'uuid/v4'
+// import * as uuid from 'uuid/v4'
 import * as _ from 'lodash';
+import { envelopeFormatter } from './formatters';
 
 const cfgFile = fs.readFileSync('./src/config.toml', "utf8");
 const config = toml.parse(cfgFile)
@@ -12,11 +13,11 @@ const nodes = config.nodes as any;
 
 const evt = new EventEmitter();
 const broadcast: BroadcastFunction = (envelope: MessageEnvelope) => {
-    console.log(envelope.sender, envelope)
-    evt.emit('broadcast', envelope)
+    console.log(envelopeFormatter(envelope));
+    setTimeout(() => evt.emit('broadcast', envelope), 2000);
 };
 
-const transactions = _.range(0, 10).map(() => `TA-${uuid()}`);
+const transactions = _.range(0, 10).map((i) => `TA-${i}`);
 
 for (const node of Object.values(nodes)) {
     const slices: ScpSlices = {

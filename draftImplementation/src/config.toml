@@ -1,7 +1,7 @@
 [nodes]
     [nodes.1]
     pk = "A"
-    slices = {t = 2, validators = ['B', 'C', 'D']}
+    slices = {t = 3, validators = ['B', 'C', 'D']}
 
     [nodes.2]
     pk = "B"
