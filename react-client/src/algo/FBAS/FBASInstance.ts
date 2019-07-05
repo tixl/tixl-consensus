@@ -7,6 +7,7 @@ import uuid from 'uuid/v4';
 import { EventEmitter } from 'events';
 import { MessageReturnType, Message, MessageStage } from '../common/messages/Message';
 import { NominatePayload } from '../common/messages/NominateMessage';
+import { PreparePayload, CommitPayload } from '../SCP/SCPInstance';
 
 export type InstanceState = Map<NodeIdentifier, NodeState>;
 
@@ -24,8 +25,11 @@ export enum FBASEvents {
 }
 
 export enum VotingType {
-    'NOMINATE' = 'NOMINATE'
+    'NOMINATE' = 'NOMINATE',
+    'PREPARE' = 'PREPARE',
+    'COMMIT' = 'COMMIT'
 }
+
 
 export class FBASInstance {
     votingId: string;
@@ -41,9 +45,9 @@ export class FBASInstance {
     eventEmitter: EventEmitter;
     slotId: number;
     votingType: VotingType;
-    messagePayload: null | NominatePayload;
+    messagePayload: NominatePayload | PreparePayload | CommitPayload;
 
-    constructor(votingId: string, nodeId: string, slices: string[][], network: Network, slotId: number, votingType: VotingType, messagePayload?: NominatePayload) {
+    constructor(votingId: string, nodeId: string, slices: string[][], network: Network, slotId: number, votingType: VotingType, messagePayload: NominatePayload | PreparePayload | CommitPayload) {
         this.votingId = votingId;
         this.nodeId = nodeId;
         this.slices = slices;
@@ -55,7 +59,7 @@ export class FBASInstance {
         this.confirmQuorum = null;
         this.slotId = slotId;
         this.votingType = votingType;
-        this.messagePayload = messagePayload || null;
+        this.messagePayload = messagePayload;
         this.state = new Map();
         this.eventEmitter = new EventEmitter();
     }

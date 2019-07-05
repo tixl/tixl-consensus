@@ -4,9 +4,34 @@ import { Message, MessageReturnType } from "../common/messages/Message";
 import { FBASInstance, FBASEvents, VotingType } from '../FBAS/FBASInstance';
 import { EventEmitter } from 'events';
 import { NominateMessageReturnType, NominatePayload } from "../common/messages/NominateMessage";
-import { Transaction, TransactionReturnType } from "./Transaction";
+import { TransactionReturnType } from "./Transaction";
 import { selectLeader } from "./selectLeader";
+import crypto from 'crypto';
 
+type Overwrite<T, U> = Pick<T, Exclude<keyof T, keyof U>> & U;
+
+export interface Ballot {
+    n: number;
+    x: TransactionReturnType[]
+};
+
+export interface PreparePayload {
+    ballot: Ballot;
+}
+
+export interface CommitPayload {
+    ballot: Ballot;
+}
+
+const hashBallot = (ballot: Ballot): string => crypto.createHash('sha256').update(JSON.stringify(ballot)).digest('hex');
+
+export interface BallotState {
+    ballot: Ballot,
+    votedPrepare: boolean,
+    confirmedPrepare: boolean,
+    votedCommit: boolean,
+    confirmedCommit: boolean;
+}
 export default class SCPInstance {
     nodeId: string;
     scpId: string;
@@ -21,6 +46,8 @@ export default class SCPInstance {
     hasNominatedOwnValues: boolean;
     eventEmitter: EventEmitter;
     fbasMap: Map<string, FBASInstance>;
+    ballots: Ballot[];
+    ballotStateMap: Map<string, BallotState>
 
     constructor(nodeId: string, slotId: number, slices: string[][], network: Network) {
         this.nodeId = nodeId;
@@ -36,6 +63,8 @@ export default class SCPInstance {
         this.hasNominatedOwnValues = false;
         this.eventEmitter = new EventEmitter();
         this.fbasMap = new Map();
+        this.ballots = [];
+        this.ballotStateMap = new Map();
     }
 
     setSuggestedTransactions(transactions: TransactionReturnType[]) {
@@ -46,46 +75,82 @@ export default class SCPInstance {
         let fbas;
         if (this.fbasMap.has(msg.votingId)) fbas = this.fbasMap.get(msg.votingId)!;
         else {
-            fbas = new FBASInstance(msg.votingId, this.nodeId, this.quorumSlices, this.network, this.slotId, msg.votingType)
+            fbas = new FBASInstance(msg.votingId, this.nodeId, this.quorumSlices, this.network, this.slotId, msg.votingType, msg.payload)
             this.fbasMap.set(msg.votingId, fbas);
-            // TODO set subscribers
+            switch (msg.votingType) {
+                case VotingType.NOMINATE: this.receiveNominateMessage(msg, fbas); break;
+                case VotingType.PREPARE: this.receiveNominateMessage(msg, fbas); break;
+                case VotingType.COMMIT: this.receiveNominateMessage(msg, fbas); break;
+            }
         }
         fbas.receiveMessage(msg);
-        switch (msg.votingType) {
-            case VotingType.NOMINATE: this.handleNominateMessage(msg, fbas); break;
-        }
+
     }
 
-    handleNominateMessage(msg: NominateMessageReturnType, fbas: FBASInstance) {
-        // from a leader
-        // if (this.leaders.includes(msg.senderId)) {
-        // only vote if nothing confirmed so far
+    receiveNominateMessage(msg: Overwrite<MessageReturnType, { payload: NominatePayload }>, fbas: FBASInstance) {
+        // TODO: should I only vote if message from leader?
         if (this.confirmedNominations.length === 0) {
+            // TODO: Validate transactions
             fbas.castVote(true);
         }
         fbas.subscribeConfirm(this.onNominateConfirm(fbas))
-        // }
+    }
+
+    receivePrepareMessage(msg: Overwrite<MessageReturnType, { payload: PreparePayload }>, fbas: FBASInstance) {
+        // Can I vote for Ballots, of that I didn't confirm the value?
+        const { ballot } = msg.payload;
+        const hash = hashBallot(ballot);
+        let ballotState: BallotState;
+        if (this.ballotStateMap.has(hash)) ballotState = this.ballotStateMap.get(hash)!
+        else {
+            ballotState = {
+                ballot,
+                votedPrepare: false,
+                confirmedPrepare: false,
+                votedCommit: false,
+                confirmedCommit: false,
+            }
+            this.ballotStateMap.set(hash, ballotState)
+        }
+        // if transactions valid
+        // if not conflicting with commits
+        fbas.castVote(true);
+        this.onStateUpdated();
+    }
+
+    receiveCommitMessage(msg: Overwrite<MessageReturnType, { payload: CommitPayload }>, fbas: FBASInstance) {
+        this.onStateUpdated();
+    }
+
+    onStateUpdated() {
+
     }
 
     run() {
-        // determine nomination leader
         this.addNewLeader();
-        // Nominate
         this.nominate();
-        //  repeat nominations from leaders
-        //  vote for everything UNTIL a value is confirmed
-        //  - when first confirmed: Balloting
-        //  - when nothing arrives: add new leader (?)
-        // Balloting
-        //  
+        setTimeout(() => {
+            if (this.confirmedNominations.length === 0) {
+                this.leaderSelectionRound++;
+                this.run();
+            }
+        }, (this.leaderSelectionRound + 1) * 500)
+    }
+
+    startBalloting() {
+        // start balloting
+
     }
 
     onNominateConfirm(fbas: FBASInstance) {
         return ({ value }: { value: boolean }) => {
             if (value !== true) return;
-            const transactions = fbas.messagePayload!.transactions
+            const transactions = (fbas.messagePayload as NominatePayload).transactions
+            const confirmedNominationsLength = this.confirmedNominations.length;
             this.confirmedNominations.push(transactions);
             console.log('Nomination confirmed for ', fbas.votingId)
+            if (confirmedNominationsLength === 0) this.startBalloting();
+            this.onStateUpdated();
         }
     }
 

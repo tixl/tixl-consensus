@@ -9,6 +9,7 @@
     "@types/react-dom": "16.8.4",
     "bigint-buffer": "^1.1.2",
     "classnames": "^2.2.6",
+    "js-combinatorics": "^0.5.4",
     "lodash": "^4.17.11",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@types/classnames": "^2.2.8",
+    "@types/js-combinatorics": "^0.5.31",
     "@types/lodash": "^4.14.134",
     "@types/socket.io-client": "^1.4.32",
     "@types/uuid": "^3.4.4",
