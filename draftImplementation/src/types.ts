@@ -26,3 +26,25 @@ export interface ScpNominate {
     voted: Value[];
     accepted: Value[]
 }
+
+export interface ScpOther{
+    someStuff: Value[]
+}
+
+export interface BaseMessageEnvelope {
+    message: ScpNominate | ScpOther
+    type: "ScpNominate" | "ScpOther"
+    sender: PublicKey
+}
+
+export interface ScpNominateEnvelope extends BaseMessageEnvelope {
+    type: "ScpNominate",
+    message: ScpNominate
+}
+
+export interface ScpOtherEnvelope extends BaseMessageEnvelope {
+    type: "ScpOther",
+    message: ScpOther
+}
+
+export type MessageEnvelope = ScpNominateEnvelope | ScpOtherEnvelope

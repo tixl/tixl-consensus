@@ -1,32 +1,31 @@
 
 import { toBigIntBE } from 'bigint-buffer';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { PublicKey, ScpSlices } from './types';
 import { nChooseK } from './helpers';
-import Slices from '../algo/common/Slices';
 import { flatten } from 'lodash';
 
-const sha256 = (input: string): bigint => toBigIntBE(crypto.createHash('sha256').update(input, 'utf8').digest());
-const hmax = BigInt(2) ** BigInt(256);
-const G = (i: bigint) => (m: bigint) => BigInt(i + '' + m);
-const G1 = G(BigInt(1));
-const G2 = G(BigInt(2));
+export const sha256 = (input: BigInt | string): bigint => toBigIntBE(crypto.createHash('sha256').update(String(input), 'utf8').digest());
+const hmax = 2n ** 256n;
+const G = (i: bigint) => (m: bigint) => sha256(BigInt(i + '' + m));
+const G1 = G(1n);
+const G2 = G(2n);
 
 const weight = (v: PublicKey, slices: ScpSlices) => {
     const [num, denom] = nodeFrac(v, slices);
     return num / denom;
 }
 
-export const neighbors = (n: PublicKey, slices: ScpSlices) => {
+export const getNeighbors = (n: PublicKey, slices: ScpSlices) => {
     return allNodesInSlices(slices).filter(v => {
-        const w = BigInt(weight(v, slices) * 1000);
-        const h = G1(BigInt(n + '' + v));
-        return h < (hmax * w / BigInt(1000))
+        const w = BigInt(Math.round(weight(v, slices) * 1000));
+        const h = G1(BigInt(sha256(n) + '' + sha256(v)));
+        return h < (hmax * w / 1000n)
     })
 }
 
-export const priority = (n: PublicKey, v: PublicKey) => {
-    return G2(BigInt(n + '' + v))
+export const getPriority = (n: PublicKey, v: PublicKey) => {
+    return G2(BigInt(sha256(n) + '' + sha256(v)))
 }
 
 
@@ -41,7 +40,7 @@ const nodeFrac = (v: PublicKey, slices: ScpSlices): [number, number] => {
     if (slices.innerSets) {
         for (const innerSet of slices.innerSets) {
             const [num, denom] = nodeFrac(v, innerSet);
-            if (num > 0) return [slices.threshold * num, len(innerSet)]
+            if (num > 0) return [slices.threshold * num, len(innerSet) * denom]
         }
     }
     return [0, 1];
