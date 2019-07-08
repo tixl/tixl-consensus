@@ -5,27 +5,28 @@ import { PublicKey, ScpSlices } from './types';
 import { nChooseK } from './helpers';
 import { flatten } from 'lodash';
 
-export const sha256 = (input: BigInt | string): bigint => toBigIntBE(crypto.createHash('sha256').update(String(input), 'utf8').digest());
+export const sha256 = (input: BigInt | string | number): bigint => toBigIntBE(crypto.createHash('sha256').update(String(input), 'utf8').digest());
 const hmax = 2n ** 256n;
 const G = (i: bigint) => (m: bigint) => sha256(BigInt(i + '' + m));
-const G1 = G(1n);
-const G2 = G(2n);
+
 
 const weight = (v: PublicKey, slices: ScpSlices) => {
     const [num, denom] = nodeFrac(v, slices);
     return num / denom;
 }
 
-export const getNeighbors = (n: PublicKey, slices: ScpSlices) => {
+// n: round
+export const getNeighbors = (slot: number, n: number, slices: ScpSlices) => {
     return allNodesInSlices(slices).filter(v => {
         const w = BigInt(Math.round(weight(v, slices) * 1000));
-        const h = G1(BigInt(sha256(n) + '' + sha256(v)));
+        const h = G(BigInt(slot))(BigInt(1 + '' + sha256(n) + '' + sha256(v)));
         return h < (hmax * w / 1000n)
     })
 }
 
-export const getPriority = (n: PublicKey, v: PublicKey) => {
-    return G2(BigInt(sha256(n) + '' + sha256(v)))
+// n: round
+export const getPriority = (slot: number, n: number, v: PublicKey) => {
+    return G(BigInt(slot))(BigInt(2 + '' + sha256(n) + '' + sha256(v)))
 }
 
 

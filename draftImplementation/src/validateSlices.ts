@@ -28,7 +28,8 @@ export const slicesThreshold = (slices: ScpSlices, stateMap: Map<PublicKey, true
 }
 
 
-export const blockingThreshold = (slices: ScpSlices, stateMap: Map<PublicKey, true>): boolean => {
+export const blockingThreshold = (slices: ScpSlices, signers: PublicKey[]): boolean => {
+    const stateMap = arrayToMap(signers);
     const signedValidators = slices.validators.filter(x => stateMap.has(x));
     if (slices.innerSets) {
         const n = slices.validators.length + slices.innerSets.length;

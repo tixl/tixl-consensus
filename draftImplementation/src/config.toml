@@ -1,16 +1,24 @@
 [nodes]
     [nodes.1]
     pk = "A"
-    slices = {t = 3, validators = ['B', 'C', 'D']}
+    slices = {t = 3, validators = ['B', 'C', 'D', 'F']}
 
     [nodes.2]
     pk = "B"
-    slices = {t = 2, validators = ['A', 'C', 'D']}
+    slices = {t = 3, validators = ['A', 'C', 'D', 'E']}
 
     [nodes.3]
     pk = "C"
-    slices = {t = 2, validators = ['B', 'A', 'D']}
+    slices = {t = 3, validators = ['B', 'A', 'D', 'F']}
 
     [nodes.4]
     pk = "D"
-    slices = {t = 2, validators = ['B', 'C', 'A']}
+    slices = {t = 3, validators = ['B', 'C', 'A', 'E']}
+
+    [nodes.5]
+    pk = "E"
+    slices = {t = 3, validators = ['B', 'C', 'A', 'F']}
+
+    [nodes.6]
+    pk = "F"
+    slices = {t = 3, validators = ['B', 'C', 'A', 'E']}
