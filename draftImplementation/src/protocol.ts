@@ -1,10 +1,10 @@
-import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope } from './types';
-import { getNeighbors, getPriority, sha256 } from './neighbors';
+import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope, ScpPrepare, ScpPrepareEnvelope, ScpBallot } from './types';
+import { getNeighbors, getPriority } from './neighbors';
 import * as _ from 'lodash';
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { quorumThreshold, blockingThreshold } from './validateSlices';
-
-const hash = (x: any) => sha256(JSON.stringify(x));
+import { hash } from './helpers';
+import BallotStorage from './BallotStorage';
 
 export type BroadcastFunction = (envelope: MessageEnvelope) => void;
 
@@ -15,28 +15,54 @@ export interface Context {
     slot: number;
 }
 
+// interface PrepareState {
+//     ballot: ScpBallot
+//     phase: 'vote' | 'accept' | 'confirm'
+// };
+
 const baseTimeoutValue = 1000;
 const timeoutValue = 1000;
 
 export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const { self, slices, suggestedValues, slot } = context;
-    let nominationRound = 1;
     const log = (...args: any[]) => console.log(`${self}: `, ...args);
+
+    // Help variables
+    let nominationTimeout: NodeJS.Timeout;
+    let prepareTimeout: NodeJS.Timeout;
+    let prepareTimeoutCounter: number;
+    const sent: bigint[] = [];
+
+    // Protocol variables
+    let nominationRound = 1;
+    const priorityNodes: PublicKey[] = [];
+
+    // State
+    let phase = 'NOMINATE';
     const TNMS = new TransactionNodeMessageStorage();
     const nodeSliceMap = new Map<PublicKey, ScpSlices>();
     nodeSliceMap.set(self, slices);
-    const sent: bigint[] = [];
-    const priorityNodes: PublicKey[] = [];
-    let nominationTimeout: NodeJS.Timeout;
+    const ballotStorage = new BallotStorage();
+    const acceptedPrepared: ScpBallot[] = [];
+    const confirmedPrepared: ScpBallot[] = [];
 
-
+    // SCP Structures
     const nominate: ScpNominate = {
         voted: [],
         accepted: [],
     }
-    const confirmedValues: Value[] = [];
-    log({ suggestedValues });
 
+    const prepare: ScpPrepare = {
+        ballot: { counter: 1, value: [] },
+        prepared: null,
+        aCounter: 0,
+        hCounter: 0,
+        cCounter: 0
+    }
+
+    const confirmedValues: Value[] = [];
+
+    // Methods 
     const onNominateUpdated = () => {
         nominate.voted = nominate.voted.sort(),
             nominate.accepted = nominate.accepted.sort()
@@ -53,8 +79,17 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
     }
 
+    const enterPreparePhase = () => {
+        prepare.ballot.value = confirmedValues;
+    }
+
     const onConfirmedUpdated = () => {
         clearTimeout(nominationTimeout);
+        if (phase === 'NOMINATE') {
+            phase = 'PREPARE'
+            enterPreparePhase();
+
+        }
         log('Confirmed: ', confirmedValues.sort().join(' '))
     }
 
@@ -115,14 +150,60 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
     }
 
+    const armTimer = () => {
+        if (prepareTimeoutCounter < prepare.ballot.counter) {
+            log('Arming timer for current counter ', prepare.ballot.counter);
+            clearTimeout(prepareTimeout);
+            prepareTimeoutCounter = prepare.ballot.counter;
+            prepareTimeout = setTimeout(() => {
+                prepare.ballot.counter++;
+            }, (prepare.ballot.counter + 1) * 1000)
+        }
+    }
+
+    const checkQuorumForCounter = () => {
+        // TODO: also include Commit and Externalize 
+        const votersWithCounterEqualOrAbove = ballotStorage.getAllVotersForBallotsWithCounterEqualOrAbove(prepare.ballot.counter);
+        const isQuorum = quorumThreshold(nodeSliceMap, votersWithCounterEqualOrAbove, self);
+        if (isQuorum) armTimer();
+    }
+
+    const checkBlockingSetForCounter = () => {
+        // TODO: also include Commit and Externalize 
+        const votersWithCounterAbove = ballotStorage.getAllVotersForBallotsWithCounterAbove(prepare.ballot.counter);
+        const isBlockingSet = blockingThreshold(slices, votersWithCounterAbove);
+        if (isBlockingSet) {
+            const lowestCounter = ballotStorage.getLowestCounterAbove(prepare.ballot.counter);
+            log('Found a blocking set with lowest timer ', lowestCounter)
+            clearTimeout(prepareTimeout);
+            prepare.ballot.counter = lowestCounter;
+            // TODO: Rework this step, this might be inefficient
+            const findsAnotherBlockingSet = checkBlockingSetForCounter();
+            if (!findsAnotherBlockingSet) {
+                checkQuorumForCounter();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // Todo: Include Counter limit logic
+    const receivePrepare = (envelope: ScpPrepareEnvelope) => {
+        const ballotHash = hash(envelope.message.ballot);
+        ballotStorage.add(envelope.message.ballot);
+        ballotStorage.setSigner(ballotHash, envelope.sender, 'vote');
+        checkQuorumForCounter();
+        checkBlockingSetForCounter();
+    }
+
     const receive = (envelope: MessageEnvelope) => {
         nodeSliceMap.set(envelope.sender, envelope.slices);
         switch (envelope.type) {
             case "ScpNominate": receiveNominate(envelope); break;
+            case "ScpPrepare": receivePrepare(envelope); break;
             default: throw new Error('unknown message type')
         }
     }
-
 
     const determinePriorityNode = () => {
         const neighbors = [self, ...getNeighbors(slot, nominationRound, slices)];
@@ -147,8 +228,8 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }, baseTimeoutValue + timeoutValue * nominationRound)
     }
 
+    // Initialize
     determinePriorityNode();
-
 
     return receive;
 }

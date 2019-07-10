@@ -14,7 +14,7 @@ const nodes = config.nodes as any;
 const evt = new EventEmitter();
 const broadcast: BroadcastFunction = (envelope: MessageEnvelope) => {
     console.log(envelopeFormatter(envelope));
-    setTimeout(() => evt.emit('broadcast', envelope), 400);
+    evt.emit('broadcast', envelope)
 };
 
 const transactions = _.range(0, 10).map((i) => `TA-${i}`);
@@ -25,5 +25,9 @@ for (const node of Object.values(nodes)) {
         validators: (node as any).slices.validators,
     };
     const receiveFunction = protocol(broadcast, { slot: 20, self: (node as any).pk, slices, suggestedValues: _.sampleSize(transactions, 5) })
-    evt.addListener('broadcast', receiveFunction);
+    evt.addListener('broadcast', (e: MessageEnvelope) => {
+        setTimeout(() => {
+            receiveFunction(e);
+        }, 200 + Math.random() * 800);
+    });
 }

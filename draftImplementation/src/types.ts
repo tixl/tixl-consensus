@@ -7,33 +7,27 @@ export interface ScpSlices {
     innerSets?: ScpSlices[];
 }
 
-// export interface ScpSlices1 {
-//     type: 'ScpSlices1',
-//     threshold: number;
-//     validators: PublicKey[];
-//     innerSets: ScpSlices2[];
-// }
-
-// export interface ScpSlices2 {
-//     type: 'ScpSlices2',
-//     threshold: number;
-//     validators: PublicKey[];
-// }
-
-// export type NestedScpSlices = ScpSlices | ScpSlices1 | ScpSlices2;
-
 export interface ScpNominate {
     voted: Value[];
     accepted: Value[]
 }
 
-export interface ScpOther{
-    someStuff: Value[]
+export interface ScpBallot {
+    value: Value[],
+    counter: number
+}
+
+export interface ScpPrepare {
+    ballot: ScpBallot       // current & highest prepare vote
+    prepared: ScpBallot | null     // highest accepted prepared ballot
+    aCounter: number        // lowest non-aborted ballot counter or 0
+    hCounter: number        // h.counter or 0 if h == NULL
+    cCounter: number        // c.counter or 0 if !c || !hCounter
 }
 
 export interface BaseMessageEnvelope {
-    message: ScpNominate | ScpOther
-    type: "ScpNominate" | "ScpOther"
+    message: ScpNominate | ScpPrepare
+    type: "ScpNominate" | "ScpPrepare"
     sender: PublicKey
     slices: ScpSlices
 }
@@ -43,9 +37,9 @@ export interface ScpNominateEnvelope extends BaseMessageEnvelope {
     message: ScpNominate
 }
 
-export interface ScpOtherEnvelope extends BaseMessageEnvelope {
-    type: "ScpOther",
-    message: ScpOther
+export interface ScpPrepareEnvelope extends BaseMessageEnvelope {
+    type: "ScpPrepare"
+    message: ScpPrepare
 }
 
-export type MessageEnvelope = ScpNominateEnvelope | ScpOtherEnvelope
+export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope
