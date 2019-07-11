@@ -52,13 +52,18 @@ export default class BallotStorage {
         return [];
     }
 
-    add(b: ScpBallot) {
+    add(b: ScpBallot): BallotHash {
         const h = hash(b);
         this.hashes.set(h, { ...b, hash: h })
         const idx = this.ballotList.findIndex(x => x.hash === h);
         if (!idx) {
             this.ballotList.push({ ...b, hash: h })
         }
+        return h;
+    }
+
+    getBallotFromHash(h: BallotHash) {
+        return this.hashes.get(h);
     }
 
     getWithCountersEqualOrAbove(counter: number) {
