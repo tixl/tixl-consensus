@@ -1,10 +1,11 @@
-import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope, ScpPrepare, ScpPrepareEnvelope, ScpBallot } from './types';
+import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope, ScpPrepare, ScpPrepareEnvelope, ScpBallot, ScpCommit, ScpCommitEnvelope } from './types';
 import { getNeighbors, getPriority } from './neighbors';
 import * as _ from 'lodash';
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { quorumThreshold, blockingThreshold } from './validateSlices';
-import { hash, isBallotLower } from './helpers';
-import BallotStorage, { BallotHash } from './BallotStorage';
+import { hash, isBallotLower, hashBallot, hashBallotValue } from './helpers';
+import { BallotHash } from './BallotStorage';
+import { PrepareStorage } from './PrepareStorage';
 
 export type BroadcastFunction = (envelope: MessageEnvelope) => void;
 
@@ -37,9 +38,10 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const TNMS = new TransactionNodeMessageStorage();
     const nodeSliceMap = new Map<PublicKey, ScpSlices>();
     nodeSliceMap.set(self, slices);
-    const ballotStorage = new BallotStorage();
-    const acceptedPrepared: BallotHash[] = [];
-    const confirmedPrepared: BallotHash[] = [];
+    const prepareStorage = new PrepareStorage();
+    // const ballotStorage = new BallotStorage();
+    const acceptedPrepared: ScpBallot[] = [];
+    const confirmedPrepared: ScpBallot[] = [];
     let commitBallot: ScpBallot | null = null;
 
     // SCP Structures
@@ -56,6 +58,13 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         cCounter: 0
     }
 
+    const commit: ScpCommit = {
+        ballot: { counter: 1, value: [] },
+        preparedCounter: 0,
+        hCounter: 0,
+        cCounter: 0,
+    }
+
     const confirmedValues: Value[] = [];
 
     // Methods 
@@ -66,6 +75,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
             type: "ScpNominate",
             message: nominate,
             sender: self,
+            timestamp: Date.now(),
             slices,
         };
         const h = hash(msg);
@@ -77,6 +87,8 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const enterPreparePhase = () => {
         prepare.ballot.value = confirmedValues;
+        commit.ballot = prepare.ballot;
+        commit.preparedCounter = prepare.prepared!.counter;
     }
 
     const onConfirmedUpdated = () => {
@@ -159,17 +171,20 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const checkQuorumForCounter = () => {
         // TODO: also include Commit and Externalize 
-        const votersWithCounterEqualOrAbove = ballotStorage.getAllVotersForBallotsWithCounterEqualOrAbove(prepare.ballot.counter);
+        const votersWithCounterEqualOrAbove = prepareStorage.getAllPreparesAsArray()
+            .filter(p => p.ballot.counter >= prepare.ballot.counter && p.ballot.counter)
+            .map(p => p.node);
         const isQuorum = quorumThreshold(nodeSliceMap, votersWithCounterEqualOrAbove, self);
         if (isQuorum) armTimer();
     }
 
     const checkBlockingSetForCounter = () => {
         // TODO: also include Commit and Externalize 
-        const votersWithCounterAbove = ballotStorage.getAllVotersForBallotsWithCounterAbove(prepare.ballot.counter);
-        const isBlockingSet = blockingThreshold(slices, votersWithCounterAbove);
+        const preparesWithCounterAbove = prepareStorage.getAllPreparesAsArray()
+            .filter(p => p.ballot.counter > prepare.ballot.counter);
+        const isBlockingSet = blockingThreshold(slices, preparesWithCounterAbove.map(p => p.node));
         if (isBlockingSet) {
-            const lowestCounter = ballotStorage.getLowestCounterAbove(prepare.ballot.counter);
+            const lowestCounter = Math.min(...preparesWithCounterAbove.map(p => p.ballot.counter));
             log('Found a blocking set with lowest timer ', lowestCounter)
             clearTimeout(prepareTimeout);
             prepare.ballot.counter = lowestCounter;
@@ -183,12 +198,10 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         return false;
     }
 
-    const acceptBallot = (h: BallotHash) => {
-        acceptedPrepared.push(h);
-        const ballot = ballotStorage.getBallotFromHash(h);
-        if (!ballot) throw new Error('Ballot Hash not in store');
-        if (prepare.prepared === null || isBallotLower(prepare.prepared, ballot)) {
-            prepare.prepared = ballot;
+    const acceptBallot = (b: ScpBallot) => {
+        acceptedPrepared.push(b);
+        if (prepare.prepared === null || isBallotLower(prepare.prepared, b)) {
+            prepare.prepared = b;
         }
     }
 
@@ -196,42 +209,45 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         confirmedPrepared.push(h);
     }
 
-    const checkBallotAccept = (h: BallotHash) => {
-        if (!acceptedPrepared.includes(h) && !confirmedPrepared.includes(h)) {
-            const voteOrAccept = ballotStorage.getSigners(h, ['vote', 'accept']);
-            if (quorumThreshold(nodeSliceMap, voteOrAccept, self)) {
-                acceptBallot(h)
-            }
-            else {
-                const accepts = ballotStorage.getSigners(h, ['accept']);
-                if (blockingThreshold(slices, accepts)) {
-                    acceptBallot(h);
-                }
-            }
+    const checkBallotAccept = () => {
+        const ballotHash = hashBallot(prepare.ballot);
+        const voteOrAccept = prepareStorage.getAllPreparesAsArray()
+            .filter(p => hashBallot(p.ballot) === ballotHash || (p.prepared && hashBallot(p.prepared) === ballotHash))
+            .map(p => p.node);
+        if (quorumThreshold(nodeSliceMap, voteOrAccept, self)) {
+            acceptBallot(prepare.ballot);
+        }
+        const accepts = prepareStorage.getAllPreparesAsArray()
+            .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash)
+            .map(p => p.node);
+        if (blockingThreshold(slices, accepts)) {
+            acceptBallot(prepare.ballot);
         }
     }
 
-    const checkBallotConfirm = (h: BallotHash) => {
-        if (!confirmedPrepared.includes(h)) {
-            const accepts = ballotStorage.getSigners(h, ['accept']);
-            if (quorumThreshold(nodeSliceMap, accepts, self)) {
-                confirmBallot(h);
-            }
+    const checkBallotConfirm = () => {
+        if (!prepare.prepared) return;
+        const ballotHash = hashBallot(prepare.prepared);
+        const accepts = prepareStorage.getAllPreparesAsArray()
+            .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash)
+            .map(p => p.node);
+        if (blockingThreshold(slices, accepts)) {
+            acceptBallot(prepare.ballot);
         }
     }
 
-    const startConfirmPhase = () => {
+    const enterConfirmPhase = () => {
+        phase = "CONFIRM";
 
     }
 
     const getHighestConfirmedPreparedBallot = () => {
         if (confirmedPrepared.length) {
-            const highestConfirmed = confirmedPrepared.map(ballotStorage.getBallotFromHash)
-                .reduce((acc, b) => {
-                    if (isBallotLower(acc!, b!)) acc = b;
-                    return acc;
-                })
-            return highestConfirmed || null;
+            const highestConfirmed = confirmedPrepared.reduce((acc, b) => {
+                if (isBallotLower(acc, b)) acc = b;
+                return acc;
+            })
+            return highestConfirmed;
         }
         return null;
     }
@@ -241,8 +257,8 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         // is taken to to be "h.value" for the highest confirmed prepared ballot "h". 
         const highestConfirmed = getHighestConfirmedPreparedBallot();
         if (highestConfirmed) {
-            prepare.ballot.value = highestConfirmed!.value;
-            startConfirmPhase();
+            prepare.ballot.value = highestConfirmed.value;
+            enterConfirmPhase();
             return;
         }
         // Otherwise (if no such "h" exists), if one or more values are
@@ -260,12 +276,12 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         // some ballot "b"), then "ballot.value" is taken as the value of
         // the highest such accepted prepared ballot.
         if (acceptedPrepared.length) {
-            const highestAccepted = acceptedPrepared.map(ballotStorage.getBallotFromHash)
+            const highestAccepted = acceptedPrepared
                 .reduce((acc, b) => {
-                    if (isBallotLower(acc!, b!)) acc = b;
+                    if (isBallotLower(acc, b)) acc = b;
                     return acc;
                 });
-            prepare.ballot.value = highestAccepted!.value
+            prepare.ballot.value = highestAccepted.value
             return;
         }
         log('Can not send PREPARE yet.')
@@ -279,10 +295,9 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         if (acceptedPrepared.length === 0) prepare.prepared = null;
         // The highest accepted prepared ballot not exceeding the "ballot" field
         const highestAcceptedPreparedBallotNotExceedingBallotField = acceptedPrepared
-            .map(ballotStorage.getBallotFromHash)
-            .filter(b => isBallotLower(b!, prepare.ballot))
+            .filter(b => isBallotLower(b, prepare.ballot))
             .reduce((acc, b) => {
-                if (isBallotLower(acc!, b!)) acc = b;
+                if (isBallotLower(acc, b)) acc = b;
                 return acc;
             })
         prepare.prepared = highestAcceptedPreparedBallotNotExceedingBallotField!;
@@ -294,7 +309,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const recalculateACounter = (oldPrepared: ScpBallot | null) => {
         if (!oldPrepared) return;
-        if (oldPrepared.value.length !== prepare.prepared!.value.length) {
+        if (hashBallotValue(oldPrepared) !== hashBallotValue(prepare.prepared)) {
             if (oldPrepared.value.length < prepare.prepared!.value.length) {
                 prepare.aCounter = oldPrepared.counter;
             }
@@ -306,7 +321,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const recalculateHCounter = () => {
         const highestConfirmed = getHighestConfirmedPreparedBallot();
-        if (highestConfirmed && highestConfirmed.value.length === prepare.ballot.value.length) {
+        if (highestConfirmed && hashBallotValue(highestConfirmed) === hashBallotValue(prepare.ballot)) {
             prepare.hCounter = highestConfirmed.counter;
         }
         else {
@@ -315,7 +330,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     }
 
     const updateCommitBallot = () => {
-        if ((commitBallot && isBallotLower(commitBallot, prepare.prepared!) && prepare.prepared!.value.length !== commitBallot.value.length)
+        if ((commitBallot && isBallotLower(commitBallot, prepare.prepared!) && hashBallotValue(prepare.prepared) !== hashBallotValue(commitBallot))
             || prepare.aCounter > prepare.cCounter) {
             commitBallot = null;
         }
@@ -330,45 +345,54 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         else { prepare.cCounter = commitBallot.counter; }
     }
 
+    const sendPrepareMessage = () => {
+        const msg: ScpPrepareEnvelope = {
+            message: prepare,
+            sender: self,
+            type: "ScpPrepare",
+            timestamp: Date.now(),
+            slices
+        }
+        const h = hash(msg);
+        if (!sent.includes(h)) {
+            sent.push(h);
+            broadcast(msg);
+        }
+    }
+
     // TODO: Include Counter limit logic
     const receivePrepare = (envelope: ScpPrepareEnvelope) => {
-        ballotStorage.setAbortCounter(envelope.sender, envelope.message.aCounter);
-        // Vote Ballot
-        const ballotHash = ballotStorage.add(envelope.message.ballot);
-        ballotStorage.setSigner(ballotHash, envelope.sender, 'vote');
-        checkBallotAccept(ballotHash);
-        // Accept Ballot
-        if (envelope.message.prepared) {
-            const preparedBallotHash = ballotStorage.add(envelope.message.prepared);
-            ballotStorage.setSigner(preparedBallotHash, envelope.sender, 'accept');
-            checkBallotAccept(preparedBallotHash);
-            checkBallotConfirm(preparedBallotHash);
-        }
+        prepareStorage.set(envelope.sender, envelope.message, envelope.timestamp);
+        checkBallotAccept();
+        checkBallotConfirm();
+
         const currentCounter = prepare.ballot.counter;
         checkQuorumForCounter();
         checkBlockingSetForCounter();
         if (prepare.ballot.counter !== currentCounter) {
-            const currentValueLength = prepare.ballot.value.length
             recalculatePrepareBallotValue();
-            if (prepare.ballot.value.length !== currentValueLength) {
-            }
         }
         const oldPrepared = prepare.prepared;
-        const preparedValueLength = prepare.prepared ? prepare.prepared.value.length : 0;
         recalculatePreparedField();
-        if ((prepare.prepared ? prepare.prepared.value.length : 0) !== preparedValueLength) {
+        if (hashBallotValue(oldPrepared) !== hashBallotValue(prepare.prepared)) {
             recalculateACounter(oldPrepared);
         }
         recalculateHCounter();
         recalculateCCounter();
+        sendPrepareMessage();
+    }
+
+    const receiveCommit = (envelope: ScpCommitEnvelope) => {
 
     }
 
     const receive = (envelope: MessageEnvelope) => {
+        // TODO: Find a better way to set the slices
         nodeSliceMap.set(envelope.sender, envelope.slices);
         switch (envelope.type) {
             case "ScpNominate": receiveNominate(envelope); break;
             case "ScpPrepare": receivePrepare(envelope); break;
+            case "ScpCommit": receiveCommit(envelope); break;
             default: throw new Error('unknown message type')
         }
     }

@@ -1,44 +1,27 @@
-import { PublicKey } from "./types";
+import { PublicKey, ScpPrepare } from "./types";
 
 export type BallotHash = bigint;
-export interface BallotState {
-    voted: boolean;
-    accepted: boolean;
-}
-type MessageType = 'vote' | 'accept';
-
 export class PrepareStorage {
-    voters: Map<BallotHash, Map<PublicKey, BallotState>>
+    data: Map<PublicKey, ScpPrepare>
+    latestTimestamps: Map<PublicKey, number>
     constructor() {
-        this.voters = new Map();
+        this.data = new Map();
+        this.latestTimestamps = new Map();
     }
 
-    set(hash: BallotHash, v: PublicKey, m: MessageType) {
-        let ballotMap: Map<PublicKey, BallotState>;
-        if (this.voters.has(hash)) ballotMap = this.voters.get(hash)!
-        else ballotMap = new Map();
-
-        let state: BallotState;
-        if (ballotMap.has(v)) state = ballotMap.get(v)!;
-        else state = { voted: false, accepted: false };
-        switch (m) {
-            case 'vote': state.voted = true; break;
-            case 'accept': state.accepted = true; break;
+    set(node: PublicKey, prepare: ScpPrepare, timestamp: number) {
+        if ((this.latestTimestamps.has(node) && this.latestTimestamps.get(node)! < timestamp) || !this.latestTimestamps.has(node)) {
+            this.data.set(node, prepare);
+            this.latestTimestamps.set(node, timestamp);
         }
-        ballotMap.set(v, state);
-        this.voters.set(hash, ballotMap);
     }
 
-    get(hash: BallotHash, ms: MessageType[]): PublicKey[] {
-        if (this.voters.has(hash)) {
-            const ballotMap = this.voters.get(hash)!;
-            const nodes = [];
-            for (const [node, value] of ballotMap) {
-                if (ms.includes('vote') && value.voted === true) nodes.push(node);
-                else if (ms.includes('accept') && value.accepted === true) nodes.push(node);
-            }
-            return nodes;
+    getAllPreparesAsArray() {
+        const values = [];
+        for (const [node, value] of this.data) {
+            values.push({ ...value, node })
         }
-        return [];
+        return values;
     }
+
 }

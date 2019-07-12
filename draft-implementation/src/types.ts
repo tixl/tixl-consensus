@@ -25,11 +25,19 @@ export interface ScpPrepare {
     cCounter: number        // c.counter or 0 if !c || !hCounter
 }
 
+export interface ScpCommit {
+    ballot: ScpBallot;
+    preparedCounter: number;
+    hCounter: number;
+    cCounter: number;
+}
+
 export interface BaseMessageEnvelope {
-    message: ScpNominate | ScpPrepare
-    type: "ScpNominate" | "ScpPrepare"
+    message: ScpNominate | ScpPrepare | ScpCommit
+    type: "ScpNominate" | "ScpPrepare" | "ScpCommit"
     sender: PublicKey
     slices: ScpSlices
+    timestamp: number
 }
 
 export interface ScpNominateEnvelope extends BaseMessageEnvelope {
@@ -42,4 +50,9 @@ export interface ScpPrepareEnvelope extends BaseMessageEnvelope {
     message: ScpPrepare
 }
 
-export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope
+export interface ScpCommitEnvelope extends BaseMessageEnvelope {
+    type: "ScpCommit",
+    message: ScpCommit
+}
+
+export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope | ScpCommitEnvelope

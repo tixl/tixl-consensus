@@ -20,3 +20,5 @@ export const isBallotLower = (a: ScpBallot, b: ScpBallot) => {
 }
 
 export const hash = (x: any) => sha256(JSON.stringify(x));
+export const hashBallot = (b: ScpBallot) => hash({ ...b, values: b.value.sort() })
+export const hashBallotValue = (b: ScpBallot | null) => hash(b ? b.value.sort() : null)
