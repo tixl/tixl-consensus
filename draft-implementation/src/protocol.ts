@@ -1,4 +1,4 @@
-import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope, ScpPrepare, ScpPrepareEnvelope, ScpBallot } from './types';
+import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope, ScpPrepare, ScpPrepareEnvelope, ScpBallot, ScpCommit, ScpCommitEnvelope } from './types';
 import { getNeighbors, getPriority } from './neighbors';
 import * as _ from 'lodash';
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
@@ -56,6 +56,13 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         cCounter: 0
     }
 
+    const commit: ScpCommit = {
+        ballot: {counter: 1, value: []},
+        preparedCounter: 0,
+        hCounter: 0,
+        cCounter: 0,
+    }
+
     const confirmedValues: Value[] = [];
 
     // Methods 
@@ -77,6 +84,8 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const enterPreparePhase = () => {
         prepare.ballot.value = confirmedValues;
+        commit.ballot = prepare.ballot;
+        commit.preparedCounter = prepare.prepared!.counter;
     }
 
     const onConfirmedUpdated = () => {
@@ -220,7 +229,8 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
     }
 
-    const startConfirmPhase = () => {
+    const enterConfirmPhase = () => {
+        phase = "CONFIRM";
 
     }
 
@@ -242,7 +252,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         const highestConfirmed = getHighestConfirmedPreparedBallot();
         if (highestConfirmed) {
             prepare.ballot.value = highestConfirmed!.value;
-            startConfirmPhase();
+            enterConfirmPhase();
             return;
         }
         // Otherwise (if no such "h" exists), if one or more values are
@@ -330,6 +340,20 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         else { prepare.cCounter = commitBallot.counter; }
     }
 
+    const sendPrepareMessage = () => {
+        const msg: ScpPrepareEnvelope = {
+            message: prepare,
+            sender: self,
+            type: "ScpPrepare",
+            slices
+        }
+        const h = hash(msg);
+        if (!sent.includes(h)) {
+            sent.push(h);
+            broadcast(msg);
+        }
+    }
+
     // TODO: Include Counter limit logic
     const receivePrepare = (envelope: ScpPrepareEnvelope) => {
         ballotStorage.setAbortCounter(envelope.sender, envelope.message.aCounter);
@@ -348,10 +372,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         checkQuorumForCounter();
         checkBlockingSetForCounter();
         if (prepare.ballot.counter !== currentCounter) {
-            const currentValueLength = prepare.ballot.value.length
             recalculatePrepareBallotValue();
-            if (prepare.ballot.value.length !== currentValueLength) {
-            }
         }
         const oldPrepared = prepare.prepared;
         const preparedValueLength = prepare.prepared ? prepare.prepared.value.length : 0;
@@ -361,14 +382,20 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
         recalculateHCounter();
         recalculateCCounter();
+        sendPrepareMessage();
+    }
+
+    const receiveCommit = (envelope: ScpCommitEnvelope) => {
 
     }
 
     const receive = (envelope: MessageEnvelope) => {
+        // TODO: Find a better way to set the slices
         nodeSliceMap.set(envelope.sender, envelope.slices);
         switch (envelope.type) {
             case "ScpNominate": receiveNominate(envelope); break;
             case "ScpPrepare": receivePrepare(envelope); break;
+            case "ScpCommit": receiveCommit(envelope); break;
             default: throw new Error('unknown message type')
         }
     }
