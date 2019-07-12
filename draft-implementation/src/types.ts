@@ -37,6 +37,7 @@ export interface BaseMessageEnvelope {
     type: "ScpNominate" | "ScpPrepare" | "ScpCommit"
     sender: PublicKey
     slices: ScpSlices
+    timestamp: number
 }
 
 export interface ScpNominateEnvelope extends BaseMessageEnvelope {
