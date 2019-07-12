@@ -16,11 +16,29 @@ export default class BallotStorage {
     ballotList: ScpBallotWithHash[]
     hashes: Map<bigint, ScpBallotWithHash>
     signers: Map<BallotHash, Map<PublicKey, BallotState>>
+    abortCounters: Array<{ node: PublicKey, counter: number }>;
 
     constructor() {
         this.ballotList = [];
         this.hashes = new Map();
         this.signers = new Map();
+        this.abortCounters = [] // Stores aCounters of other nodes
+    }
+
+    setAbortCounter(node: PublicKey, counter: number) {
+        const existing = this.abortCounters.find(x => x.node === node)
+        if (existing) {
+            existing.counter = Math.max(existing.counter, counter);
+        }
+        else this.abortCounters.push({ node, counter });
+    }
+
+    getAbortCounter(node: PublicKey) {
+        return this.abortCounters.find(x => x.node === node);
+    }
+
+    getAllNodesWithAbortCounterHigherOrEqualThanALowerThanB(a: number, b: number) {
+        return this.abortCounters.filter(x => x.counter >= a && x.counter < b);
     }
 
     setSigner(hash: BallotHash, v: PublicKey, m: MessageType) {

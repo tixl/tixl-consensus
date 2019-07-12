@@ -15,11 +15,6 @@ export interface Context {
     slot: number;
 }
 
-// interface PrepareState {
-//     ballot: ScpBallot
-//     phase: 'vote' | 'accept' | 'confirm'
-// };
-
 const baseTimeoutValue = 1000;
 const timeoutValue = 1000;
 
@@ -45,6 +40,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const ballotStorage = new BallotStorage();
     const acceptedPrepared: BallotHash[] = [];
     const confirmedPrepared: BallotHash[] = [];
+    let commitBallot: ScpBallot | null = null;
 
     // SCP Structures
     const nominate: ScpNominate = {
@@ -228,15 +224,23 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     }
 
-    const recalculatePrepareBallotValue = (): void => {
-        //  If any ballot has been confirmed prepared, then "ballot.value"
-        // is taken to to be "h.value" for the highest confirmed prepared ballot "h". 
+    const getHighestConfirmedPreparedBallot = () => {
         if (confirmedPrepared.length) {
             const highestConfirmed = confirmedPrepared.map(ballotStorage.getBallotFromHash)
                 .reduce((acc, b) => {
                     if (isBallotLower(acc!, b!)) acc = b;
                     return acc;
                 })
+            return highestConfirmed || null;
+        }
+        return null;
+    }
+
+    const recalculatePrepareBallotValue = (): void => {
+        //  If any ballot has been confirmed prepared, then "ballot.value"
+        // is taken to to be "h.value" for the highest confirmed prepared ballot "h". 
+        const highestConfirmed = getHighestConfirmedPreparedBallot();
+        if (highestConfirmed) {
             prepare.ballot.value = highestConfirmed!.value;
             startConfirmPhase();
             return;
@@ -264,12 +268,13 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
             prepare.ballot.value = highestAccepted!.value
             return;
         }
-        log('Can not send Prepare yet.')
+        log('Can not send PREPARE yet.')
         return;
-
     }
 
-    const recalculatePrepareField = (): void => {
+    const recalculatePreparedField = (): void => {
+        // FIXME: Check if all lesser ballots have been aborted
+
         //  or NULL if no ballot has been accepted prepared. 
         if (acceptedPrepared.length === 0) prepare.prepared = null;
         // The highest accepted prepared ballot not exceeding the "ballot" field
@@ -287,8 +292,47 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
     }
 
+    const recalculateACounter = (oldPrepared: ScpBallot | null) => {
+        if (!oldPrepared) return;
+        if (oldPrepared.value.length !== prepare.prepared!.value.length) {
+            if (oldPrepared.value.length < prepare.prepared!.value.length) {
+                prepare.aCounter = oldPrepared.counter;
+            }
+            else {
+                prepare.aCounter = oldPrepared.counter + 1;
+            }
+        }
+    }
+
+    const recalculateHCounter = () => {
+        const highestConfirmed = getHighestConfirmedPreparedBallot();
+        if (highestConfirmed && highestConfirmed.value.length === prepare.ballot.value.length) {
+            prepare.hCounter = highestConfirmed.counter;
+        }
+        else {
+            prepare.hCounter = 0;
+        }
+    }
+
+    const updateCommitBallot = () => {
+        if ((commitBallot && isBallotLower(commitBallot, prepare.prepared!) && prepare.prepared!.value.length !== commitBallot.value.length)
+            || prepare.aCounter > prepare.cCounter) {
+            commitBallot = null;
+        }
+        if (commitBallot === null && prepare.hCounter === prepare.ballot.counter) {
+            commitBallot = prepare.ballot;
+        }
+    }
+
+    const recalculateCCounter = () => {
+        updateCommitBallot();
+        if (commitBallot === null || prepare.hCounter === 0) { prepare.cCounter = 0; }
+        else { prepare.cCounter = commitBallot.counter; }
+    }
+
     // TODO: Include Counter limit logic
     const receivePrepare = (envelope: ScpPrepareEnvelope) => {
+        ballotStorage.setAbortCounter(envelope.sender, envelope.message.aCounter);
         // Vote Ballot
         const ballotHash = ballotStorage.add(envelope.message.ballot);
         ballotStorage.setSigner(ballotHash, envelope.sender, 'vote');
@@ -303,7 +347,21 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         const currentCounter = prepare.ballot.counter;
         checkQuorumForCounter();
         checkBlockingSetForCounter();
-        if (prepare.ballot.counter !== currentCounter) recalculatePrepareBallotValue();
+        if (prepare.ballot.counter !== currentCounter) {
+            const currentValueLength = prepare.ballot.value.length
+            recalculatePrepareBallotValue();
+            if (prepare.ballot.value.length !== currentValueLength) {
+            }
+        }
+        const oldPrepared = prepare.prepared;
+        const preparedValueLength = prepare.prepared ? prepare.prepared.value.length : 0;
+        recalculatePreparedField();
+        if ((prepare.prepared ? prepare.prepared.value.length : 0) !== preparedValueLength) {
+            recalculateACounter(oldPrepared);
+        }
+        recalculateHCounter();
+        recalculateCCounter();
+
     }
 
     const receive = (envelope: MessageEnvelope) => {
