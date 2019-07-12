@@ -10,7 +10,7 @@
     "bigint-buffer": "^1.1.2",
     "classnames": "^2.2.6",
     "js-combinatorics": "^0.5.4",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.14",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-scripts": "3.0.1",

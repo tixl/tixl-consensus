@@ -34,7 +34,7 @@
     "@types/chalk": "^2.2.0",
     "@types/lodash": "^4.14.123",
     "chalk": "^2.4.2",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.14",
     "namor": "^1.1.2",
     "socket.io": "^2.2.0"
   },
