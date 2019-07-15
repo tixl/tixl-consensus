@@ -8,6 +8,8 @@ import { GenericStorage } from './GenericStorage';
 
 export type BroadcastFunction = (envelope: MessageEnvelope) => void;
 
+const maxVal = 100000;
+
 export interface Context {
     self: PublicKey
     slices: ScpSlices
@@ -45,8 +47,8 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const acceptedPrepared: ScpBallot[] = [];
     const confirmedPrepared: ScpBallot[] = [];
     let commitBallot: ScpBallot | null = null;
-    const acceptedCommited: ScpBallot[] = [];
-    const confirmedCommited: ScpBallot[] = [];
+    const acceptedCommitted: ScpBallot[] = [];
+    const confirmedCommitted: ScpBallot[] = [];
 
     // SCP Structures
     const nominate: ScpNominate = {
@@ -66,7 +68,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         ballot: { counter: 1, value: [] },
         preparedCounter: 0,
         hCounter: 0,
-        cCounter: Number.MAX_SAFE_INTEGER,
+        cCounter: 0,
     }
 
     const externalize: ScpExternalize = {
@@ -101,6 +103,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     }
 
     const enterPreparePhase = () => {
+        phase = 'PREPARE'
         log('Entering Prepare Phase')
         prepare.ballot.value = confirmedValues;
         sendPrepareMessage();
@@ -109,9 +112,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const onConfirmedUpdated = () => {
         clearTimeout(nominationTimeout);
         if (phase === 'NOMINATE') {
-            phase = 'PREPARE'
             enterPreparePhase();
-
         }
         log('Confirmed: ', confirmedValues.sort().join(' '))
     }
@@ -185,27 +186,37 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     }
 
     const checkQuorumForCounter = (increaseFunc: () => void) => {
-        // TODO: also include Commit and Externalize 
-        const votersWithCounterEqualOrAbove = prepareStorage.getAllValuesAsArary()
-            .filter(p => p.ballot.counter >= prepare.ballot.counter && p.ballot.counter)
+        const votersFormPrepare = prepareStorage.getAllValuesAsArary()
+            .filter(p => p.ballot.counter && (p.ballot.counter >= prepare.ballot.counter))
             .map(p => p.node);
+        const votersFromCommit = commitStorage.getAllValuesAsArary()
+            .filter(p => p.ballot.counter && (p.ballot.counter >= prepare.ballot.counter))
+            .map(p => p.node);
+        const votersFromExternalize = externalizeStorage.getAllValuesAsArary().map(p => p.node);
+        const votersWithCounterEqualOrAbove = _.uniq([...votersFormPrepare, ...votersFromCommit, ...votersFromExternalize]);
         const isQuorum = quorumThreshold(nodeSliceMap, votersWithCounterEqualOrAbove, self);
         if (isQuorum) armTimer(increaseFunc);
     }
 
     const checkBlockingSetForCounter = (setFunc: (value: number) => void) => {
-        // TODO: also include Commit and Externalize 
         const preparesWithCounterAbove = prepareStorage.getAllValuesAsArary()
             .filter(p => p.ballot.counter > prepare.ballot.counter);
-        const isBlockingSet = blockingThreshold(slices, preparesWithCounterAbove.map(p => p.node));
+        const commitsWithCounterAbove = commitStorage.getAllValuesAsArary()
+            .filter(p => p.ballot.counter > prepare.ballot.counter);
+        const externalizesWithCounterAbove = externalizeStorage.getAllValuesAsArary(); // externalize implicitly has counter Infinity
+        const nodesWithCounterAbove = _.uniq([...preparesWithCounterAbove, ...commitsWithCounterAbove, ...externalizesWithCounterAbove].map(x => x.node));
+        const isBlockingSet = blockingThreshold(slices, nodesWithCounterAbove);
         if (isBlockingSet) {
-            const lowestCounter = Math.min(...preparesWithCounterAbove.map(p => p.ballot.counter));
-            log('Found a blocking set with lowest timer ', lowestCounter)
+            const counters = [...preparesWithCounterAbove.map(p => p.ballot.counter), ...commitsWithCounterAbove.map(p => p.ballot.counter)];
+            const lowestCounter = Math.min(...counters, maxVal);
+            log('Found a blocking set with lowest counter ', lowestCounter)
             clearTimeout(prepareTimeout);
             setFunc(lowestCounter);
-
             // TODO: Rework this step, this might be inefficient
-            const findsAnotherBlockingSet = checkBlockingSetForCounter(setFunc);
+            let findsAnotherBlockingSet = false;
+            if (lowestCounter !== maxVal) {
+                findsAnotherBlockingSet = checkBlockingSetForCounter(setFunc);
+            }
             if (!findsAnotherBlockingSet) {
                 checkQuorumForCounter(() => prepare.ballot.counter++);
             }
@@ -426,18 +437,17 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const acceptCommitBallot = (ballot: ScpBallot) => {
         const h = hashBallot(ballot);
-        if (!acceptedCommited.find(x => hashBallot(x) !== h)) {
-            acceptedCommited.push(ballot)
+        if (!acceptedCommitted.find(x => hashBallot(x) !== h)) {
+            acceptedCommitted.push(ballot)
         }
     }
 
     const confirmCommitBallot = (ballot: ScpBallot) => {
         const h = hashBallot(ballot);
-        if (confirmedCommited.find(x => hashBallot(x) === h) === undefined) {
+        if (confirmedCommitted.find(x => hashBallot(x) === h) === undefined) {
             log('!!!!!!!!!!!!!!!!!!!!!!!!!!')
             log('CONFIRMED BALLOT ', ballot.counter, ballot.value.join(' '))
-            enterExternalizePhase();
-            confirmedCommited.push(ballot)
+            confirmedCommitted.push(ballot)
         }
     }
 
@@ -483,12 +493,18 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const recalculateCommitCCounter = () => {
         // TODO: how to set this when no ballots in acceptedCommited
-        const min = Math.min(...acceptedCommited.map(x => x.counter), Number.MAX_SAFE_INTEGER)
-        commit.cCounter = min;
+        if (acceptedCommitted.length) {
+            const min = Math.min(...acceptedCommitted.map(x => x.counter))
+            commit.cCounter = min;
+        }
+        else {
+            commit.cCounter = 0;
+        }
+
     }
 
     const recalculateCommitHCounter = () => {
-        const max = Math.max(...acceptedCommited.map(x => x.counter), 0)
+        const max = Math.max(...acceptedCommitted.map(x => x.counter), 0)
         commit.hCounter = max;
     }
 
@@ -510,17 +526,25 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
     }
 
+    const checkEnterExternalizePhase = () => {
+        if (confirmCommitBallot.length) {
+            enterExternalizePhase();
+        }
+    }
+
     const receiveCommit = (envelope: ScpCommitEnvelope) => {
         commitStorage.set(envelope.sender, envelope.message, envelope.timestamp);
         checkCommitBallotAccept();
         checkCommitBallotConfirm();
-        // TODO: SO far this only includes prepare messages, this needs to include commit msgs
         checkQuorumForCounter(() => commit.ballot.counter++);
         checkBlockingSetForCounter((value: number) => commit.ballot.counter = value);
         recalculatePreparedCounter();
         recalculateCommitCCounter();
         recalculateCommitHCounter();
-        if (phase === 'COMMIT') sendCommitMessage();
+        if (phase === 'COMMIT') {
+            sendCommitMessage();
+            checkEnterExternalizePhase();
+        }
     }
 
     const sendExternalizeMessage = () => {
