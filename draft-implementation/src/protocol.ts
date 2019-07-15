@@ -4,8 +4,8 @@ import * as _ from 'lodash';
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { quorumThreshold, blockingThreshold } from './validateSlices';
 import { hash, isBallotLower, hashBallot, hashBallotValue } from './helpers';
-import { BallotHash } from './BallotStorage';
 import { PrepareStorage } from './PrepareStorage';
+import { CommitStorage } from './CommitStorage';
 
 export type BroadcastFunction = (envelope: MessageEnvelope) => void;
 
@@ -15,6 +15,8 @@ export interface Context {
     suggestedValues: Value[],
     slot: number;
 }
+
+export type Phase = 'NOMINATE' | 'PREPARE' | 'COMMIT' | 'EXTERNALIZE';
 
 const baseTimeoutValue = 1000;
 const timeoutValue = 1000;
@@ -34,15 +36,17 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const priorityNodes: PublicKey[] = [];
 
     // State
-    let phase = 'NOMINATE';
+    let phase: Phase = 'NOMINATE';
     const TNMS = new TransactionNodeMessageStorage();
     const nodeSliceMap = new Map<PublicKey, ScpSlices>();
     nodeSliceMap.set(self, slices);
     const prepareStorage = new PrepareStorage();
-    // const ballotStorage = new BallotStorage();
+    const commitStorage = new CommitStorage();
     const acceptedPrepared: ScpBallot[] = [];
     const confirmedPrepared: ScpBallot[] = [];
     let commitBallot: ScpBallot | null = null;
+    const acceptedCommited: ScpBallot[] = [];
+    const confirmedCommited: ScpBallot[] = [];
 
     // SCP Structures
     const nominate: ScpNominate = {
@@ -62,23 +66,29 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         ballot: { counter: 1, value: [] },
         preparedCounter: 0,
         hCounter: 0,
-        cCounter: 0,
+        cCounter: Number.MAX_SAFE_INTEGER,
     }
 
     const confirmedValues: Value[] = [];
 
     // Methods 
+
     const onNominateUpdated = () => {
-        nominate.voted = nominate.voted.sort(),
-            nominate.accepted = nominate.accepted.sort()
-        const msg: ScpNominateEnvelope = {
-            type: "ScpNominate",
+        nominate.voted = nominate.voted.sort()
+        nominate.accepted = nominate.accepted.sort()
+        if (phase !== 'NOMINATE') return;
+        const payload = {
+            type: "ScpNominate" as "ScpNominate",
             message: nominate,
             sender: self,
-            timestamp: Date.now(),
             slices,
+        }
+        const msg: ScpNominateEnvelope = {
+            ...payload,
+            timestamp: Date.now(),
+
         };
-        const h = hash(msg);
+        const h = hash(payload);
         if (!sent.includes(h)) {
             sent.push(h);
             broadcast(msg)
@@ -86,9 +96,9 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     }
 
     const enterPreparePhase = () => {
+        log('Entering Prepare Phase')
         prepare.ballot.value = confirmedValues;
-        commit.ballot = prepare.ballot;
-        commit.preparedCounter = prepare.prepared!.counter;
+        sendPrepareMessage();
     }
 
     const onConfirmedUpdated = () => {
@@ -158,27 +168,27 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
     }
 
-    const armTimer = () => {
+    const armTimer = (increaseFunc: () => void) => {
         if (prepareTimeoutCounter < prepare.ballot.counter) {
             log('Arming timer for current counter ', prepare.ballot.counter);
             clearTimeout(prepareTimeout);
             prepareTimeoutCounter = prepare.ballot.counter;
             prepareTimeout = setTimeout(() => {
-                prepare.ballot.counter++;
+                increaseFunc();
             }, (prepare.ballot.counter + 1) * 1000)
         }
     }
 
-    const checkQuorumForCounter = () => {
+    const checkQuorumForCounter = (increaseFunc: () => void) => {
         // TODO: also include Commit and Externalize 
         const votersWithCounterEqualOrAbove = prepareStorage.getAllPreparesAsArray()
             .filter(p => p.ballot.counter >= prepare.ballot.counter && p.ballot.counter)
             .map(p => p.node);
         const isQuorum = quorumThreshold(nodeSliceMap, votersWithCounterEqualOrAbove, self);
-        if (isQuorum) armTimer();
+        if (isQuorum) armTimer(increaseFunc);
     }
 
-    const checkBlockingSetForCounter = () => {
+    const checkBlockingSetForCounter = (setFunc: (value: number) => void) => {
         // TODO: also include Commit and Externalize 
         const preparesWithCounterAbove = prepareStorage.getAllPreparesAsArray()
             .filter(p => p.ballot.counter > prepare.ballot.counter);
@@ -187,58 +197,71 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
             const lowestCounter = Math.min(...preparesWithCounterAbove.map(p => p.ballot.counter));
             log('Found a blocking set with lowest timer ', lowestCounter)
             clearTimeout(prepareTimeout);
-            prepare.ballot.counter = lowestCounter;
+            setFunc(lowestCounter);
+
             // TODO: Rework this step, this might be inefficient
-            const findsAnotherBlockingSet = checkBlockingSetForCounter();
+            const findsAnotherBlockingSet = checkBlockingSetForCounter(setFunc);
             if (!findsAnotherBlockingSet) {
-                checkQuorumForCounter();
+                checkQuorumForCounter(() => prepare.ballot.counter++);
             }
             return true;
         }
         return false;
     }
 
-    const acceptBallot = (b: ScpBallot) => {
-        acceptedPrepared.push(b);
+    const acceptPrepareBallot = (b: ScpBallot) => {
+        const h = hashBallot(b);
+        if (!acceptedPrepared.find(x => hashBallot(x) === h)) {
+            log('ACCEPT prepapre ballot', b.counter, b.value.join(' '));
+            acceptedPrepared.push(b);
+        }
         if (prepare.prepared === null || isBallotLower(prepare.prepared, b)) {
             prepare.prepared = b;
         }
     }
 
-    const confirmBallot = (h: BallotHash) => {
-        confirmedPrepared.push(h);
+    const confirmPrepareBallot = (b: ScpBallot) => {
+        const h = hashBallot(b);
+        if (!confirmedPrepared.find(x => hashBallot(x) === h)) {
+            log('CONFIRM prepapre ballot', b.counter, b.value.join(' '));
+            confirmedPrepared.push(b);
+            enterCommitPhase();
+        }
     }
 
-    const checkBallotAccept = () => {
+    const checkPrepareBallotAccept = () => {
         const ballotHash = hashBallot(prepare.ballot);
         const voteOrAccept = prepareStorage.getAllPreparesAsArray()
             .filter(p => hashBallot(p.ballot) === ballotHash || (p.prepared && hashBallot(p.prepared) === ballotHash))
             .map(p => p.node);
         if (quorumThreshold(nodeSliceMap, voteOrAccept, self)) {
-            acceptBallot(prepare.ballot);
+            acceptPrepareBallot(prepare.ballot);
         }
         const accepts = prepareStorage.getAllPreparesAsArray()
             .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash)
             .map(p => p.node);
         if (blockingThreshold(slices, accepts)) {
-            acceptBallot(prepare.ballot);
+            acceptPrepareBallot(prepare.ballot);
         }
     }
 
-    const checkBallotConfirm = () => {
+    const checkPrepareBallotConfirm = () => {
         if (!prepare.prepared) return;
         const ballotHash = hashBallot(prepare.prepared);
         const accepts = prepareStorage.getAllPreparesAsArray()
             .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash)
             .map(p => p.node);
-        if (blockingThreshold(slices, accepts)) {
-            acceptBallot(prepare.ballot);
+        if (quorumThreshold(nodeSliceMap, accepts, self)) {
+            confirmPrepareBallot(prepare.ballot);
         }
     }
 
-    const enterConfirmPhase = () => {
-        phase = "CONFIRM";
-
+    const enterCommitPhase = () => {
+        log('Entering Commit Phase')
+        phase = "COMMIT";
+        commit.ballot = prepare.ballot;
+        commit.preparedCounter = prepare.prepared!.counter;
+        sendCommitMessage();
     }
 
     const getHighestConfirmedPreparedBallot = () => {
@@ -252,13 +275,25 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         return null;
     }
 
+
+    const getHighestAcceptedPreparedBallot = () => {
+        if (acceptedPrepared.length) {
+            const highestAccepted = acceptedPrepared.reduce((acc, b) => {
+                if (isBallotLower(acc, b)) acc = b;
+                return acc;
+            })
+            return highestAccepted;
+        }
+        return null;
+    }
+
     const recalculatePrepareBallotValue = (): void => {
         //  If any ballot has been confirmed prepared, then "ballot.value"
         // is taken to to be "h.value" for the highest confirmed prepared ballot "h". 
         const highestConfirmed = getHighestConfirmedPreparedBallot();
         if (highestConfirmed) {
             prepare.ballot.value = highestConfirmed.value;
-            enterConfirmPhase();
+            enterCommitPhase();
             return;
         }
         // Otherwise (if no such "h" exists), if one or more values are
@@ -275,12 +310,8 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         // prepared (because "prepare(b)" meets blocking threshold for
         // some ballot "b"), then "ballot.value" is taken as the value of
         // the highest such accepted prepared ballot.
-        if (acceptedPrepared.length) {
-            const highestAccepted = acceptedPrepared
-                .reduce((acc, b) => {
-                    if (isBallotLower(acc, b)) acc = b;
-                    return acc;
-                });
+        const highestAccepted = getHighestAcceptedPreparedBallot();
+        if (highestAccepted) {
             prepare.ballot.value = highestAccepted.value
             return;
         }
@@ -294,16 +325,19 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         //  or NULL if no ballot has been accepted prepared. 
         if (acceptedPrepared.length === 0) prepare.prepared = null;
         // The highest accepted prepared ballot not exceeding the "ballot" field
-        const highestAcceptedPreparedBallotNotExceedingBallotField = acceptedPrepared
-            .filter(b => isBallotLower(b, prepare.ballot))
-            .reduce((acc, b) => {
-                if (isBallotLower(acc, b)) acc = b;
-                return acc;
-            })
-        prepare.prepared = highestAcceptedPreparedBallotNotExceedingBallotField!;
-        if (prepare.ballot.value.length < prepare.prepared.value.length && prepare.ballot.counter === prepare.prepared.counter) {
-            prepare.prepared.counter = prepare.ballot.counter - 1;
-            // Note:  it is not possible to vote to commit a ballot with counter 0.
+        const ballotsLowerThanPrepare = acceptedPrepared.filter(b => isBallotLower(b, prepare.ballot))
+        if (ballotsLowerThanPrepare.length) {
+
+            const highestAcceptedPreparedBallotNotExceedingBallotField =
+                ballotsLowerThanPrepare.reduce((acc, b) => {
+                    if (isBallotLower(acc, b)) acc = b;
+                    return acc;
+                })
+            prepare.prepared = highestAcceptedPreparedBallotNotExceedingBallotField!;
+            if (prepare.ballot.value.length < prepare.prepared.value.length && prepare.ballot.counter === prepare.prepared.counter) {
+                prepare.prepared.counter = prepare.ballot.counter - 1;
+                // Note:  it is not possible to vote to commit a ballot with counter 0.
+            }
         }
     }
 
@@ -346,14 +380,17 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     }
 
     const sendPrepareMessage = () => {
-        const msg: ScpPrepareEnvelope = {
+        const payload = {
             message: prepare,
             sender: self,
-            type: "ScpPrepare",
-            timestamp: Date.now(),
+            type: "ScpPrepare" as 'ScpPrepare',
             slices
         }
-        const h = hash(msg);
+        const msg: ScpPrepareEnvelope = {
+            ...payload,
+            timestamp: Date.now(),
+        }
+        const h = hash(payload);
         if (!sent.includes(h)) {
             sent.push(h);
             broadcast(msg);
@@ -363,12 +400,12 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     // TODO: Include Counter limit logic
     const receivePrepare = (envelope: ScpPrepareEnvelope) => {
         prepareStorage.set(envelope.sender, envelope.message, envelope.timestamp);
-        checkBallotAccept();
-        checkBallotConfirm();
+        checkPrepareBallotAccept();
+        checkPrepareBallotConfirm();
 
         const currentCounter = prepare.ballot.counter;
-        checkQuorumForCounter();
-        checkBlockingSetForCounter();
+        checkQuorumForCounter(() => prepare.ballot.counter++);
+        checkBlockingSetForCounter((value: number) => prepare.ballot.counter = value);
         if (prepare.ballot.counter !== currentCounter) {
             recalculatePrepareBallotValue();
         }
@@ -379,11 +416,107 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         }
         recalculateHCounter();
         recalculateCCounter();
-        sendPrepareMessage();
+        if (phase === "PREPARE") {
+            sendPrepareMessage();
+        }
+    }
+
+    const acceptCommitBallot = (ballot: ScpBallot) => {
+        const h = hashBallot(ballot);
+        if (!acceptedCommited.find(x => hashBallot(x) !== h)) {
+            acceptedCommited.push(ballot)
+        }
+    }
+
+    const confirmCommitBallot = (ballot: ScpBallot) => {
+        const h = hashBallot(ballot);
+        if (confirmedCommited.find(x => hashBallot(x) === h) === undefined) {
+            log('!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            log('CONFIRMED BALLOT ', ballot.counter, ballot.value.join(' '))
+            confirmedCommited.push(ballot)
+        }
+    }
+
+    const checkCommitBallotAccept = () => {
+        const votesOrAccepts = commitStorage.getAllCommitsAsArray()
+            .filter(c =>
+                // accepts
+                (hashBallotValue(c.ballot) === hashBallotValue(commit.ballot) && (c.cCounter >= commit.ballot.counter && c.hCounter <= commit.ballot.counter))
+                // votes
+                || (hashBallotValue(c.ballot) === hashBallotValue(commit.ballot) && commit.ballot.counter >= c.cCounter)
+            ).map(c => c.node);
+        if (quorumThreshold(nodeSliceMap, votesOrAccepts, self)) {
+            acceptCommitBallot(commit.ballot);
+        }
+        const accepts = commitStorage.getAllCommitsAsArray()
+            .filter(c =>
+                // accepts
+                (hashBallotValue(c.ballot) === hashBallotValue(commit.ballot) && (c.cCounter >= commit.ballot.counter && c.hCounter <= commit.ballot.counter))
+            ).map(c => c.node);
+        if (blockingThreshold(slices, accepts)) {
+            acceptCommitBallot(commit.ballot);
+        }
+    }
+
+    const checkCommitBallotConfirm = () => {
+        const accepts = commitStorage.getAllCommitsAsArray()
+            .filter(c =>
+                // accepts
+                (hashBallotValue(c.ballot) === hashBallotValue(commit.ballot) && (c.cCounter >= commit.ballot.counter && c.hCounter <= commit.ballot.counter))
+            ).map(c => c.node);
+        if (quorumThreshold(nodeSliceMap, accepts, self)) {
+            confirmCommitBallot(commit.ballot);
+        }
+    }
+
+    const recalculatePreparedCounter = () => {
+        // TODO: Check if this is complete / right
+        const highestAccepted = getHighestAcceptedPreparedBallot()
+        if (highestAccepted) {
+            commit.preparedCounter = highestAccepted.counter;
+        }
+    }
+
+    const recalculateCommitCCounter = () => {
+        // TODO: how to set this when no ballots in acceptedCommited
+        const min = Math.min(...acceptedCommited.map(x => x.counter), Number.MAX_SAFE_INTEGER)
+        commit.cCounter = min;
+    }
+
+    const recalculateCommitHCounter = () => {
+        const max = Math.max(...acceptedCommited.map(x => x.counter), 0)
+        commit.hCounter = max;
+    }
+
+    const sendCommitMessage = () => {
+        const payload = {
+            message: commit,
+            sender: self,
+            type: "ScpCommit" as "ScpCommit",
+            slices
+        }
+        const msg: ScpCommitEnvelope = {
+            timestamp: Date.now(),
+            ...payload
+        }
+        const h = hash(payload);
+        if (!sent.includes(h)) {
+            sent.push(h);
+            broadcast(msg);
+        }
     }
 
     const receiveCommit = (envelope: ScpCommitEnvelope) => {
-
+        commitStorage.set(envelope.sender, envelope.message, envelope.timestamp);
+        checkCommitBallotAccept();
+        checkCommitBallotConfirm();
+        // TODO: SO far this only includes prepare messages, this needs to include commit msgs
+        checkQuorumForCounter(() => commit.ballot.counter++);
+        checkBlockingSetForCounter((value: number) => commit.ballot.counter = value);
+        recalculatePreparedCounter();
+        recalculateCommitCCounter();
+        recalculateCommitHCounter();
+        if (phase === 'COMMIT') sendCommitMessage();
     }
 
     const receive = (envelope: MessageEnvelope) => {
@@ -423,5 +556,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     // Initialize
     determinePriorityNode();
 
+
+    // TODO: also return promise with result of the slot
     return receive;
 }

@@ -1,21 +1,21 @@
-import { PublicKey, ScpPrepare } from "./types";
+import { PublicKey, ScpCommit } from "./types";
 
-export class PrepareStorage {
-    data: Map<PublicKey, ScpPrepare>
+export class CommitStorage {
+    data: Map<PublicKey, ScpCommit>
     latestTimestamps: Map<PublicKey, number>
     constructor() {
         this.data = new Map();
         this.latestTimestamps = new Map();
     }
 
-    set(node: PublicKey, prepare: ScpPrepare, timestamp: number) {
+    set(node: PublicKey, commit: ScpCommit, timestamp: number) {
         if ((this.latestTimestamps.has(node) && this.latestTimestamps.get(node)! < timestamp) || !this.latestTimestamps.has(node)) {
-            this.data.set(node, prepare);
+            this.data.set(node, commit);
             this.latestTimestamps.set(node, timestamp);
         }
     }
 
-    getAllPreparesAsArray() {
+    getAllCommitsAsArray() {
         const values = [];
         for (const [node, value] of this.data) {
             values.push({ ...value, node })
