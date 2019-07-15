@@ -1,11 +1,10 @@
-import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope, ScpPrepare, ScpPrepareEnvelope, ScpBallot, ScpCommit, ScpCommitEnvelope } from './types';
+import { ScpNominate, ScpSlices, Value, PublicKey, MessageEnvelope, ScpNominateEnvelope, ScpPrepare, ScpPrepareEnvelope, ScpBallot, ScpCommit, ScpCommitEnvelope, ScpExternalize, ScpExternalizeEnvelope } from './types';
 import { getNeighbors, getPriority } from './neighbors';
 import * as _ from 'lodash';
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { quorumThreshold, blockingThreshold } from './validateSlices';
 import { hash, isBallotLower, hashBallot, hashBallotValue } from './helpers';
-import { PrepareStorage } from './PrepareStorage';
-import { CommitStorage } from './CommitStorage';
+import { GenericStorage } from './GenericStorage';
 
 export type BroadcastFunction = (envelope: MessageEnvelope) => void;
 
@@ -40,8 +39,9 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const TNMS = new TransactionNodeMessageStorage();
     const nodeSliceMap = new Map<PublicKey, ScpSlices>();
     nodeSliceMap.set(self, slices);
-    const prepareStorage = new PrepareStorage();
-    const commitStorage = new CommitStorage();
+    const prepareStorage = new GenericStorage<ScpPrepare>();
+    const commitStorage = new GenericStorage<ScpCommit>();
+    const externalizeStorage = new GenericStorage<ScpExternalize>();
     const acceptedPrepared: ScpBallot[] = [];
     const confirmedPrepared: ScpBallot[] = [];
     let commitBallot: ScpBallot | null = null;
@@ -67,6 +67,11 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         preparedCounter: 0,
         hCounter: 0,
         cCounter: Number.MAX_SAFE_INTEGER,
+    }
+
+    const externalize: ScpExternalize = {
+        commit: { counter: 1, value: [] },
+        hCounter: 0,
     }
 
     const confirmedValues: Value[] = [];
@@ -181,7 +186,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const checkQuorumForCounter = (increaseFunc: () => void) => {
         // TODO: also include Commit and Externalize 
-        const votersWithCounterEqualOrAbove = prepareStorage.getAllPreparesAsArray()
+        const votersWithCounterEqualOrAbove = prepareStorage.getAllValuesAsArary()
             .filter(p => p.ballot.counter >= prepare.ballot.counter && p.ballot.counter)
             .map(p => p.node);
         const isQuorum = quorumThreshold(nodeSliceMap, votersWithCounterEqualOrAbove, self);
@@ -190,7 +195,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const checkBlockingSetForCounter = (setFunc: (value: number) => void) => {
         // TODO: also include Commit and Externalize 
-        const preparesWithCounterAbove = prepareStorage.getAllPreparesAsArray()
+        const preparesWithCounterAbove = prepareStorage.getAllValuesAsArary()
             .filter(p => p.ballot.counter > prepare.ballot.counter);
         const isBlockingSet = blockingThreshold(slices, preparesWithCounterAbove.map(p => p.node));
         if (isBlockingSet) {
@@ -231,13 +236,13 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
 
     const checkPrepareBallotAccept = () => {
         const ballotHash = hashBallot(prepare.ballot);
-        const voteOrAccept = prepareStorage.getAllPreparesAsArray()
+        const voteOrAccept = prepareStorage.getAllValuesAsArary()
             .filter(p => hashBallot(p.ballot) === ballotHash || (p.prepared && hashBallot(p.prepared) === ballotHash))
             .map(p => p.node);
         if (quorumThreshold(nodeSliceMap, voteOrAccept, self)) {
             acceptPrepareBallot(prepare.ballot);
         }
-        const accepts = prepareStorage.getAllPreparesAsArray()
+        const accepts = prepareStorage.getAllValuesAsArary()
             .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash)
             .map(p => p.node);
         if (blockingThreshold(slices, accepts)) {
@@ -248,7 +253,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     const checkPrepareBallotConfirm = () => {
         if (!prepare.prepared) return;
         const ballotHash = hashBallot(prepare.prepared);
-        const accepts = prepareStorage.getAllPreparesAsArray()
+        const accepts = prepareStorage.getAllValuesAsArary()
             .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash)
             .map(p => p.node);
         if (quorumThreshold(nodeSliceMap, accepts, self)) {
@@ -320,8 +325,6 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     }
 
     const recalculatePreparedField = (): void => {
-        // FIXME: Check if all lesser ballots have been aborted
-
         //  or NULL if no ballot has been accepted prepared. 
         if (acceptedPrepared.length === 0) prepare.prepared = null;
         // The highest accepted prepared ballot not exceeding the "ballot" field
@@ -433,12 +436,13 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         if (confirmedCommited.find(x => hashBallot(x) === h) === undefined) {
             log('!!!!!!!!!!!!!!!!!!!!!!!!!!')
             log('CONFIRMED BALLOT ', ballot.counter, ballot.value.join(' '))
+            enterExternalizePhase();
             confirmedCommited.push(ballot)
         }
     }
 
     const checkCommitBallotAccept = () => {
-        const votesOrAccepts = commitStorage.getAllCommitsAsArray()
+        const votesOrAccepts = commitStorage.getAllValuesAsArary()
             .filter(c =>
                 // accepts
                 (hashBallotValue(c.ballot) === hashBallotValue(commit.ballot) && (c.cCounter >= commit.ballot.counter && c.hCounter <= commit.ballot.counter))
@@ -448,7 +452,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         if (quorumThreshold(nodeSliceMap, votesOrAccepts, self)) {
             acceptCommitBallot(commit.ballot);
         }
-        const accepts = commitStorage.getAllCommitsAsArray()
+        const accepts = commitStorage.getAllValuesAsArary()
             .filter(c =>
                 // accepts
                 (hashBallotValue(c.ballot) === hashBallotValue(commit.ballot) && (c.cCounter >= commit.ballot.counter && c.hCounter <= commit.ballot.counter))
@@ -459,7 +463,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
     }
 
     const checkCommitBallotConfirm = () => {
-        const accepts = commitStorage.getAllCommitsAsArray()
+        const accepts = commitStorage.getAllValuesAsArary()
             .filter(c =>
                 // accepts
                 (hashBallotValue(c.ballot) === hashBallotValue(commit.ballot) && (c.cCounter >= commit.ballot.counter && c.hCounter <= commit.ballot.counter))
@@ -519,6 +523,36 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
         if (phase === 'COMMIT') sendCommitMessage();
     }
 
+    const sendExternalizeMessage = () => {
+        const payload = {
+            message: externalize,
+            sender: self,
+            type: "ScpExternalize" as 'ScpExternalize',
+            slices
+        }
+        const msg: ScpExternalizeEnvelope = {
+            ...payload,
+            timestamp: Date.now(),
+        }
+        const h = hash(payload);
+        if (!sent.includes(h)) {
+            sent.push(h);
+            broadcast(msg);
+        }
+    }
+
+    const enterExternalizePhase = () => {
+        phase = "EXTERNALIZE";
+        log('entering EXTERNALIZE phase');
+        externalize.commit = commit.ballot;
+        externalize.hCounter = commit.ballot.counter;
+        sendExternalizeMessage();
+    }
+
+    const receiveExternalize = (envelope: ScpExternalizeEnvelope) => {
+        externalizeStorage.set(envelope.sender, envelope.message, envelope.timestamp);
+    }
+
     const receive = (envelope: MessageEnvelope) => {
         // TODO: Find a better way to set the slices
         nodeSliceMap.set(envelope.sender, envelope.slices);
@@ -526,6 +560,7 @@ export const protocol = (broadcast: BroadcastFunction, context: Context) => {
             case "ScpNominate": receiveNominate(envelope); break;
             case "ScpPrepare": receivePrepare(envelope); break;
             case "ScpCommit": receiveCommit(envelope); break;
+            case "ScpExternalize": receiveExternalize(envelope); break;
             default: throw new Error('unknown message type')
         }
     }

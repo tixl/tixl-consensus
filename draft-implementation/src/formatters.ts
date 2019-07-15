@@ -8,6 +8,7 @@ export const envelopeFormatter = (envelope: MessageEnvelope): string => {
         case 'ScpNominate': type = chalk.green('NOM'); break;
         case 'ScpPrepare': type = chalk.yellow('PREP'); break;
         case 'ScpCommit': type = chalk.red('COM'); break;
+        case 'ScpExternalize': type = chalk.blue('EXT'); break;
     }
     if (envelope.type === 'ScpNominate') {
         const vote = chalk.red(envelope.message.voted.sort().join(' '))
@@ -22,6 +23,11 @@ export const envelopeFormatter = (envelope: MessageEnvelope): string => {
     if (envelope.type === 'ScpCommit') {
         const msg = envelope.message;
         const msgStr = `B Counter ${msg.ballot.counter} - Value ${msg.ballot.value.join(' ')} | preparedCounter ${msg.preparedCounter} c ${msg.cCounter} h ${msg.hCounter}`
+        return `${sender} ${type} - ${msgStr}`
+    }
+    if (envelope.type === 'ScpExternalize') {
+        const msg = envelope.message;
+        const msgStr = `Commit Counter ${msg.commit.counter} - Value ${msg.commit.value.join(' ')} | h ${msg.hCounter}`
         return `${sender} ${type} - ${msgStr}`
     }
     return '';

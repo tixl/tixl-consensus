@@ -1,21 +1,21 @@
-import { PublicKey, ScpCommit } from "./types";
+import { PublicKey } from "./types";
 
-export class CommitStorage {
-    data: Map<PublicKey, ScpCommit>
+export class GenericStorage<T> {
+    data: Map<PublicKey, T>
     latestTimestamps: Map<PublicKey, number>
     constructor() {
         this.data = new Map();
         this.latestTimestamps = new Map();
     }
 
-    set(node: PublicKey, commit: ScpCommit, timestamp: number) {
+    set(node: PublicKey, value: T, timestamp: number) {
         if ((this.latestTimestamps.has(node) && this.latestTimestamps.get(node)! < timestamp) || !this.latestTimestamps.has(node)) {
-            this.data.set(node, commit);
+            this.data.set(node, value);
             this.latestTimestamps.set(node, timestamp);
         }
     }
 
-    getAllCommitsAsArray() {
+    getAllValuesAsArary() {
         const values = [];
         for (const [node, value] of this.data) {
             values.push({ ...value, node })

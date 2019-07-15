@@ -32,9 +32,14 @@ export interface ScpCommit {
     cCounter: number;
 }
 
+export interface ScpExternalize {
+    commit: ScpBallot;
+    hCounter: number;
+}
+
 export interface BaseMessageEnvelope {
-    message: ScpNominate | ScpPrepare | ScpCommit
-    type: "ScpNominate" | "ScpPrepare" | "ScpCommit"
+    message: ScpNominate | ScpPrepare | ScpCommit | ScpExternalize
+    type: "ScpNominate" | "ScpPrepare" | "ScpCommit" | "ScpExternalize"
     sender: PublicKey
     slices: ScpSlices
     timestamp: number
@@ -55,4 +60,9 @@ export interface ScpCommitEnvelope extends BaseMessageEnvelope {
     message: ScpCommit
 }
 
-export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope | ScpCommitEnvelope
+export interface ScpExternalizeEnvelope extends BaseMessageEnvelope {
+    type: "ScpExternalize"
+    message: ScpExternalize
+}
+
+export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope | ScpCommitEnvelope | ScpExternalizeEnvelope
