@@ -11,23 +11,23 @@ export const envelopeFormatter = (envelope: MessageEnvelope): string => {
         case 'ScpExternalize': type = chalk.blue('EXT'); break;
     }
     if (envelope.type === 'ScpNominate') {
-        const vote = chalk.red(envelope.message.voted.sort().join(' '))
-        const accept = chalk.yellow(envelope.message.accepted.sort().join(' '))
+        const vote = chalk.red(envelope.message.voted.sort().join('-'))
+        const accept = chalk.yellow(envelope.message.accepted.sort().join('-'))
         return `${sender} ${type} VOTE ${vote} ACC ${accept}`
     }
     if (envelope.type === 'ScpPrepare') {
         const msg = envelope.message;
-        const msgStr = `B Counter ${msg.ballot.counter} - Value ${msg.ballot.value.join(' ')} | Prepare Counter ${msg.prepared && msg.prepared.counter} | Value ${msg.prepared && msg.prepared.value.join(' ')} |  a ${msg.aCounter} h ${msg.hCounter} c ${msg.cCounter}`
+        const msgStr = `<${msg.ballot.counter},${chalk.yellow(msg.ballot.value.join('-'))}> | Prepare <${msg.prepared && msg.prepared.counter},${msg.prepared && msg.prepared.value.join('-')}> |  a ${msg.aCounter} h ${msg.hCounter} c ${msg.cCounter}`
         return `${sender} ${type} - ${msgStr}`
     }
     if (envelope.type === 'ScpCommit') {
         const msg = envelope.message;
-        const msgStr = `B Counter ${msg.ballot.counter} - Value ${msg.ballot.value.join(' ')} | preparedCounter ${msg.preparedCounter} c ${msg.cCounter} h ${msg.hCounter}`
+        const msgStr = `<${msg.ballot.counter},${chalk.yellow(msg.ballot.value.join('-'))}> | preparedCounter ${msg.preparedCounter} c ${msg.cCounter} h ${msg.hCounter}`
         return `${sender} ${type} - ${msgStr}`
     }
     if (envelope.type === 'ScpExternalize') {
         const msg = envelope.message;
-        const msgStr = `Commit Counter ${msg.commit.counter} - Value ${msg.commit.value.join(' ')} | h ${msg.hCounter}`
+        const msgStr = `<${msg.commit.counter},${chalk.yellow(msg.commit.value.join('-'))}> | h ${msg.hCounter}`
         return `${sender} ${type} - ${msgStr}`
     }
     return '';
