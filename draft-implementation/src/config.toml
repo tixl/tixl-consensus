@@ -16,7 +16,7 @@
     slices = {t = 2, validators = ['B', 'C', 'A']}
 
     # [nodes.5]
-    # pk = "E"ß
+    # pk = "E"
     # slices = {t = 3, validators = ['B', 'C', 'A', 'F']}
 
     # [nodes.6]

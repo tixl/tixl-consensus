@@ -4,7 +4,7 @@ const arrayToMap = <T>(arr: T[]): Map<T, true> => arr.reduce((a, x) => a.set(x, 
 
 export const quorumThreshold = (nodeSlicesMap: Map<PublicKey, ScpSlices>, signers: PublicKey[], thisNode: PublicKey) => {
     const thisSlices = nodeSlicesMap.get(thisNode);
-    if (!thisSlices) throw new Error('No slices for this node supplied');
+    if (!thisSlices) throw new Error('No slices for this node supplied '+ thisNode);
     const signerMap = arrayToMap(signers);
     if (!slicesThreshold(thisSlices, signerMap)) return false;
     const convincedNodes = []
