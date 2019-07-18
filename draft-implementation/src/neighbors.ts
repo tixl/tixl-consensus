@@ -2,7 +2,6 @@
 import { toBigIntBE } from 'bigint-buffer';
 import * as crypto from 'crypto';
 import { PublicKey, ScpSlices } from './types';
-import { nChooseK } from './helpers';
 import { flatten } from 'lodash';
 
 export const sha256 = (input: BigInt | string | number): bigint => toBigIntBE(crypto.createHash('sha256').update(String(input), 'utf8').digest());
@@ -52,17 +51,17 @@ const allNodesInSlices = (slices: ScpSlices): PublicKey[] => {
     return [...slices.validators, ...nested];
 }
 
-export const amountSlices = (slices: ScpSlices): number => {
-    const k = slices.threshold
-    if (slices.innerSets) {
-        const n = slices.validators.length + slices.innerSets.length;
-        const nk = nChooseK(n, k);
-        if (!slices.innerSets.length) return nk;
-        const c = nk * k / n; // Amount of tuples every element appears in  
-        return slices.innerSets.reduce((acc, set) => acc + c * (amountSlices(set) - 1), nk)
-    }
-    else {
-        const n = slices.validators.length;
-        return nChooseK(n, k);
-    }
-}
+// export const amountSlices = (slices: ScpSlices): number => {
+//     const k = slices.threshold
+//     if (slices.innerSets) {
+//         const n = slices.validators.length + slices.innerSets.length;
+//         const nk = nChooseK(n, k);
+//         if (!slices.innerSets.length) return nk;
+//         const c = nk * k / n; // Amount of tuples every element appears in  
+//         return slices.innerSets.reduce((acc, set) => acc + c * (amountSlices(set) - 1), nk)
+//     }
+//     else {
+//         const n = slices.validators.length;
+//         return nChooseK(n, k);
+//     }
+// }

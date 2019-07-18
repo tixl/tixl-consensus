@@ -1,16 +1,14 @@
 import { ScpBallot, ScpPrepareEnvelope } from "../types";
-import { ProtocolOptions, BroadcastFunction, checkQuorumForCounterFunction, checkBlockingSetForCounterFunction } from "../protocol";
+import { BroadcastFunction, } from "../protocol";
 import ProtocolState from '../ProtocolState';
-import { hash, hashBallot, isBallotLower, hashBallotValue } from "../helpers";
+import { hashBallot, isBallotLower, hashBallotValue, checkQuorumForCounter, checkBlockingSetForCounter } from "../helpers";
 import { quorumThreshold, blockingThreshold } from "../validateSlices";
 import * as _ from 'lodash';
 
 
 
-export const prepare = (state: ProtocolState, options: ProtocolOptions, broadcast: BroadcastFunction, log: (...args: any[]) => void, enterCommitPhase: () => void, checkQuorumForCounter: checkQuorumForCounterFunction, checkBlockingSetForCounter: checkBlockingSetForCounterFunction) => {
-    const { self, slices } = options;
-
-    const sent: bigint[] = [];
+export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, enterCommitPhase: () => void) => {
+    const log = (...args: any[]) => state.log(...args);
 
     const acceptPrepareBallot = (b: ScpBallot) => {
         const h = hashBallot(b);
@@ -42,8 +40,7 @@ export const prepare = (state: ProtocolState, options: ProtocolOptions, broadcas
         const voteOrAccept = state.prepareStorage.getAllValuesAsArary()
             .filter(p => hashBallot(p.ballot) === ballotHash || (p.prepared && hashBallot(p.prepared) === ballotHash))
             .map(p => p.node);
-        // log({ voteOrAccept })
-        if (quorumThreshold(state.nodeSliceMap, voteOrAccept, self)) {
+        if (quorumThreshold(state.nodeSliceMap, voteOrAccept, state.options.self)) {
             acceptPrepareBallot(state.prepare.ballot);
         }
         const acceptPrepares = state.prepareStorage.getAllValuesAsArary()
@@ -53,8 +50,7 @@ export const prepare = (state: ProtocolState, options: ProtocolOptions, broadcas
         const externalizes = state.externalizeStorage.getAllValuesAsArary()
             .filter(e => e.commit && hashBallot(e.commit) === ballotHash);
         const nodes = [...acceptPrepares, ...commits, ...externalizes].map(p => p.node);
-        // log({ accepts })
-        if (blockingThreshold(slices, nodes)) {
+        if (blockingThreshold(state.options.slices, nodes)) {
             acceptPrepareBallot(ballot);
         }
     }
@@ -72,7 +68,7 @@ export const prepare = (state: ProtocolState, options: ProtocolOptions, broadcas
             .filter(e => hashBallotValue(e.commit) === hashBallotValue(ballot))
             .map(e => e.node);
         const signers = _.uniq([...acceptPrepares, ...commits, ...externalizes]);
-        if (quorumThreshold(state.nodeSliceMap, signers, self)) {
+        if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
             confirmPrepareBallot(ballot);
         }
     }
@@ -171,21 +167,14 @@ export const prepare = (state: ProtocolState, options: ProtocolOptions, broadcas
     }
 
     const sendPrepareMessage = () => {
-        const payload = {
-            message: state.prepare,
-            sender: self,
-            type: "ScpPrepare" as 'ScpPrepare',
-            slices
-        }
         const msg: ScpPrepareEnvelope = {
-            ...payload,
+            message: state.prepare,
+            sender: state.options.self,
+            type: "ScpPrepare" as 'ScpPrepare',
+            slices: state.options.slices,
             timestamp: Date.now(),
         }
-        const h = hash(payload);
-        if (!sent.includes(h)) {
-            sent.push(h);
-            broadcast(msg);
-        }
+        broadcast(msg);
     }
 
     const checkEnterCommitPhase = () => {
@@ -212,8 +201,8 @@ export const prepare = (state: ProtocolState, options: ProtocolOptions, broadcas
         if (state.phase === "PREPARE") {
 
             const currentCounter = state.prepare.ballot.counter;
-            checkQuorumForCounter(() => state.prepare.ballot.counter++);
-            checkBlockingSetForCounter((value: number) => state.prepare.ballot.counter = value);
+            checkQuorumForCounter(state, () => state.prepare.ballot.counter++);
+            checkBlockingSetForCounter(state, (value: number) => state.prepare.ballot.counter = value);
             if (state.prepare.ballot.counter !== currentCounter) {
                 recalculatePrepareBallotValue();
             }

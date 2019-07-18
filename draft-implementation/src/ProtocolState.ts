@@ -2,6 +2,7 @@ import { PublicKey, ScpSlices, ScpPrepare, ScpCommit, ScpExternalize, ScpBallot,
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { GenericStorage } from './GenericStorage';
 import { isBallotLower } from "./helpers";
+import { ProtocolOptions } from "./protocol";
 
 export type ProtocolPhase = 'NOMINATE' | 'PREPARE' | 'COMMIT' | 'EXTERNALIZE';
 
@@ -28,8 +29,10 @@ export default class ProtocolState {
     prepare: ScpPrepare;
     commit: ScpCommit;
     externalize: ScpExternalize;
+    options: ProtocolOptions;
 
-    constructor() {
+    constructor(options: ProtocolOptions) {
+        this.options = options;
         this.phase = 'NOMINATE';
         this.nominationTimeout = null;
         this.prepareTimeout = null;
@@ -38,6 +41,7 @@ export default class ProtocolState {
         this.priorityNodes = [];
         this.TNMS = new TransactionNodeMessageStorage();
         this.nodeSliceMap = new Map();
+        this.nodeSliceMap.set(options.self, options.slices);
         this.prepareStorage = new GenericStorage<ScpPrepare>();
         this.commitStorage = new GenericStorage<ScpCommit>();
         this.externalizeStorage = new GenericStorage<ScpExternalize>();
@@ -68,6 +72,10 @@ export default class ProtocolState {
             commit: { counter: 1, value: [] },
             hCounter: 0,
         }
+    }
+
+    log(...args: any[]) {
+        console.log(this.options.self + ': ', ...args);
     }
 
     getHighestConfirmedPreparedBallot() {

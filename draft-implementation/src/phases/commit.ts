@@ -1,14 +1,13 @@
 import { ScpCommitEnvelope, ScpBallot } from "../types";
-import { ProtocolOptions, BroadcastFunction, checkQuorumForCounterFunction, checkBlockingSetForCounterFunction } from "../protocol";
+import { BroadcastFunction } from "../protocol";
 import ProtocolState from '../ProtocolState';
-import { hash, hashBallot, hashBallotValue } from "../helpers";
+import { hashBallot, hashBallotValue, checkQuorumForCounter, checkBlockingSetForCounter } from "../helpers";
 import { quorumThreshold, blockingThreshold } from "../validateSlices";
 import * as _ from 'lodash';
 
 
-export const commit = (state: ProtocolState, options: ProtocolOptions, broadcast: BroadcastFunction, log: (...args: any[]) => void, enterExternalizePhase: () => void, checkQuorumForCounter: checkQuorumForCounterFunction, checkBlockingSetForCounter: checkBlockingSetForCounterFunction) => {
-    const { self, slices } = options;
-    const sent: bigint[] = [];
+export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enterExternalizePhase: () => void) => {
+    const log = (...args: any[]) => state.log(...args);
 
     const acceptCommitBallot = (ballot: ScpBallot) => {
         const h = hashBallot(ballot);
@@ -34,7 +33,7 @@ export const commit = (state: ProtocolState, options: ProtocolOptions, broadcast
                 // votes
                 || (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && state.commit.ballot.counter >= c.cCounter)
             ).map(c => c.node);
-        if (quorumThreshold(state.nodeSliceMap, votesOrAccepts, self)) {
+        if (quorumThreshold(state.nodeSliceMap, votesOrAccepts, state.options.self)) {
             acceptCommitBallot(state.commit.ballot);
         }
         const accepts = state.commitStorage.getAllValuesAsArary()
@@ -42,7 +41,7 @@ export const commit = (state: ProtocolState, options: ProtocolOptions, broadcast
                 // accepts
                 (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && (c.cCounter >= state.commit.ballot.counter && c.hCounter <= state.commit.ballot.counter))
             ).map(c => c.node);
-        if (blockingThreshold(slices, accepts)) {
+        if (blockingThreshold(state.options.slices, accepts)) {
             acceptCommitBallot(state.commit.ballot);
         }
     }
@@ -53,7 +52,7 @@ export const commit = (state: ProtocolState, options: ProtocolOptions, broadcast
                 // accepts
                 (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && (c.cCounter >= state.commit.ballot.counter && c.hCounter <= state.commit.ballot.counter))
             ).map(c => c.node);
-        if (quorumThreshold(state.nodeSliceMap, accepts, self)) {
+        if (quorumThreshold(state.nodeSliceMap, accepts, state.options.self)) {
             confirmCommitBallot(state.commit.ballot);
         }
     }
@@ -84,21 +83,14 @@ export const commit = (state: ProtocolState, options: ProtocolOptions, broadcast
     }
 
     const sendCommitMessage = () => {
-        const payload = {
-            message: state.commit,
-            sender: self,
-            type: "ScpCommit" as "ScpCommit",
-            slices
-        }
         const msg: ScpCommitEnvelope = {
+            message: state.commit,
+            sender: state.options.self,
+            type: "ScpCommit" as "ScpCommit",
             timestamp: Date.now(),
-            ...payload
+            slices: state.options.slices
         }
-        const h = hash(payload);
-        if (!sent.includes(h)) {
-            sent.push(h);
-            broadcast(msg);
-        }
+        broadcast(msg);
     }
 
     const checkEnterExternalizePhase = () => {
@@ -120,8 +112,8 @@ export const commit = (state: ProtocolState, options: ProtocolOptions, broadcast
         checkCommitBallotAccept();
         checkCommitBallotConfirm();
         if (state.phase === 'COMMIT') {
-            checkQuorumForCounter(() => state.commit.ballot.counter++);
-            checkBlockingSetForCounter((value: number) => state.commit.ballot.counter = value);
+            checkQuorumForCounter(state, () => state.commit.ballot.counter++);
+            checkBlockingSetForCounter(state, (value: number) => state.commit.ballot.counter = value);
             recalculatePreparedCounter();
             recalculateCommitCCounter();
             recalculateCommitHCounter();
