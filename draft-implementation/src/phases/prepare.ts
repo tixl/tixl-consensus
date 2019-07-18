@@ -5,8 +5,6 @@ import { hashBallot, isBallotLower, hashBallotValue, checkQuorumForCounter, chec
 import { quorumThreshold, blockingThreshold } from "../validateSlices";
 import * as _ from 'lodash';
 
-
-
 export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, enterCommitPhase: () => void) => {
     const log = (...args: any[]) => state.log(...args);
 

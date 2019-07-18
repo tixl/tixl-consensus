@@ -20,6 +20,8 @@ const armTimer = (state: ProtocolState, increaseFunc: () => void) => {
         if (state.prepareTimeout) clearTimeout(state.prepareTimeout);
         state.prepareTimeoutCounter = state.prepare.ballot.counter;
         state.prepareTimeout = setTimeout(() => {
+            state.log('Timer fired for counter ', state.prepare.ballot.counter);
+            // FIXME: send message again
             increaseFunc();
         }, (state.prepare.ballot.counter + 1) * 1000)
     }

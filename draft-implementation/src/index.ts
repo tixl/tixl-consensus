@@ -16,11 +16,19 @@ const nodes = config.nodes as any;
 
 const evt = new EventEmitter();
 const broadcast: BroadcastFunction = (envelope: MessageEnvelope) => {
-    console.log(envelopeFormatter(envelope));
-    evt.emit('broadcast', envelope)
+    if (chance.bool({ likelihood: 100 })) {
+        console.log(envelopeFormatter(envelope));
+        evt.emit('broadcast', JSON.stringify(envelope))
+
+    } else {
+        console.log('SKIPPED', envelopeFormatter(envelope));
+    }
+
 };
 
-const ta = _.range(0, 10).map(String);
+const ta = _.range(0, 10).map(i => `T${i}`);
+
+const enableLog = true;
 
 const getTransactionsForNode = (i: number) => {
     switch (i) {
@@ -39,12 +47,16 @@ for (const node of Object.values(nodes)) {
         threshold: (node as any).slices.t,
         validators: (node as any).slices.validators,
     };
-    const { receive, init } = protocol(broadcast, { slot: 20, self: (node as any).pk, slices, suggestedValues: getTransactionsForNode(i) })
+    const { receive, init } = protocol(broadcast, { enableLog, slot: 3, self: (node as any).pk, slices, suggestedValues: getTransactionsForNode(i) })
     inits.push(init);
-    evt.addListener('broadcast', (e: MessageEnvelope) => {
+    evt.addListener('broadcast', (e: string) => {
+        const envelope: MessageEnvelope = JSON.parse(e);
         setTimeout(() => {
-            receive(e);
-        }, chance.integer({ min: 0, max: 3000 }));
+            // const formatted = envelopeFormatter(envelope);
+            // console.log(`Node ${(node as any).pk} receives `, formatted);
+            receive(envelope);
+
+        }, chance.integer({ min: 1000, max: 5000 }));
     });
 }
 inits.forEach(init => init());

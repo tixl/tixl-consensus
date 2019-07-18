@@ -75,7 +75,7 @@ export default class ProtocolState {
     }
 
     log(...args: any[]) {
-        console.log(this.options.self + ': ', ...args);
+        this.options.enableLog && console.log(this.options.self + ': ', ...args);
     }
 
     getHighestConfirmedPreparedBallot() {

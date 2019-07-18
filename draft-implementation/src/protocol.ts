@@ -15,6 +15,7 @@ export interface ProtocolOptions {
     slices: ScpSlices
     suggestedValues: Value[],
     slot: number;
+    enableLog: boolean;
 }
 
 export type checkQuorumForCounterFunction = (increaseFunc: () => void) => void;
@@ -82,6 +83,5 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
         determinePriorityNode();
     }
 
-    // TODO: also return promise with result of the slot
     return { receive, init };
 }
