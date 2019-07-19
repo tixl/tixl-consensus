@@ -7,7 +7,7 @@ import * as _ from 'lodash';
 
 export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, enterPreparePhase: () => void) => {
     const log = (...args: any[]) => state.log(...args);
-    
+
     const onNominateUpdated = () => {
         state.nominate.voted = state.nominate.voted.sort()
         state.nominate.accepted = state.nominate.accepted.sort()
@@ -57,6 +57,7 @@ export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, ent
     }
 
     const receiveNominate = (envelope: ScpNominateEnvelope) => {
+        state.nominateStorage.set(envelope.sender, envelope.message, envelope.timestamp);
         envelope.message.voted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'vote'))
         envelope.message.accepted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'accept'))
         if (state.priorityNodes.includes(envelope.sender)) {

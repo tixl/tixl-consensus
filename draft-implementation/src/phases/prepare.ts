@@ -12,6 +12,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         const h = hashBallot(b);
         if (!state.acceptedPrepared.find(x => hashBallot(x) === h)) {
             log('ACCEPT prepare ballot', b.counter, b.value.join(' '));
+            // log(b.value.join(' '))
             state.acceptedPrepared.push(b);
         }
         if (state.prepare.prepared === null || isBallotLower(state.prepare.prepared, b)) {
@@ -31,6 +32,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     }
 
     const checkPrepareBallotAccept = (ballot: ScpBallot) => {
+        // FIXME: Node accepts higher ballot but sends lesser prepared in message
         // FIXME: What if we're already at another ballot
         // Track other ballots
         // TODO: include all the messages from above
@@ -39,7 +41,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
             .filter(p => hashBallot(p.ballot) === ballotHash || (p.prepared && hashBallot(p.prepared) === ballotHash))
             .map(p => p.node);
         if (quorumThreshold(state.nodeSliceMap, voteOrAccept, state.options.self)) {
-            acceptPrepareBallot(state.prepare.ballot);
+            acceptPrepareBallot(ballot);
         }
         const acceptPrepares = state.prepareStorage.getAllValuesAsArary()
             .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash);
@@ -191,12 +193,13 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     // TODO: Include Counter limit logic
     const receivePrepare = (envelope: ScpPrepareEnvelope) => {
         state.prepareStorage.set(envelope.sender, envelope.message, envelope.timestamp);
-        checkPrepareBallotAccept(state.prepare.ballot);
-        checkPrepareBallotAccept(envelope.message.ballot);
-        if (state.prepare.prepared) {
-            checkPrepareBallotConfirm(state.prepare.prepared);
-        }
         if (state.phase === "PREPARE") {
+
+            checkPrepareBallotAccept(state.prepare.ballot);
+            checkPrepareBallotAccept(envelope.message.ballot);
+            if (state.prepare.prepared) {
+                checkPrepareBallotConfirm(state.prepare.prepared);
+            }
 
             const currentCounter = state.prepare.ballot.counter;
             checkQuorumForCounter(state, () => state.prepare.ballot.counter++);

@@ -59,13 +59,19 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
         const neighbors = [state.options.self, ...getNeighbors(state.options.slot, state.nominationRound, state.options.slices)];
         const priorities = new Map<PublicKey, BigInt>();
         neighbors.forEach(v => priorities.set(v, getPriority(state.options.slot, state.nominationRound, v)));
-        log({ neighbors });
 
         const maxPriorityNeighbor: PublicKey = neighbors.reduce((acc, v) => {
             if (priorities.get(v)! > priorities.get(acc)!) acc = v;
             return acc;
         });
-        if (!state.priorityNodes.includes(maxPriorityNeighbor)) state.priorityNodes.push(maxPriorityNeighbor)
+        if (!state.priorityNodes.includes(maxPriorityNeighbor)) {
+            state.priorityNodes.push(maxPriorityNeighbor)
+            // add votes from newly elected leader
+            const lastNominate = state.nominateStorage.getValueFromNode(maxPriorityNeighbor);
+            if (lastNominate) {
+                addToVotes([...lastNominate.accepted, ...lastNominate.voted])
+            }
+        }
         log({ maxPriorityNeighbor })
 
         if (state.priorityNodes.includes(state.options.self)) {

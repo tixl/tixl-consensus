@@ -1,0 +1,4 @@
+Node D receives  A: PREP - <1,T1-T3> | Prepare <null,null> |  a 0 h 0 c 0
+D:  ACCEPT prepare ballot 1 T0 T1 T2 T3 T4
+D:  Arming timer for current counter  1
+Node D sends     D: PREP - <1,T0-T1-T2-T3-T4> | Prepare <1,T0-T1-T2-T3-T4> |  a 0 h 0 c 0

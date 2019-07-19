@@ -23,4 +23,8 @@ export class GenericStorage<T> {
         return values;
     }
 
+    getValueFromNode(node: PublicKey) {
+        return this.data.get(node) || null;
+    }
+
 }

@@ -16,6 +16,7 @@ export default class ProtocolState {
     priorityNodes: PublicKey[];
     TNMS: TransactionNodeMessageStorage;
     nodeSliceMap: Map<PublicKey, ScpSlices>;
+    nominateStorage: GenericStorage<ScpNominate>;
     prepareStorage: GenericStorage<ScpPrepare>;
     commitStorage: GenericStorage<ScpCommit>;
     externalizeStorage: GenericStorage<ScpExternalize>;
@@ -42,6 +43,7 @@ export default class ProtocolState {
         this.TNMS = new TransactionNodeMessageStorage();
         this.nodeSliceMap = new Map();
         this.nodeSliceMap.set(options.self, options.slices);
+        this.nominateStorage = new GenericStorage<ScpNominate>();
         this.prepareStorage = new GenericStorage<ScpPrepare>();
         this.commitStorage = new GenericStorage<ScpCommit>();
         this.externalizeStorage = new GenericStorage<ScpExternalize>();
