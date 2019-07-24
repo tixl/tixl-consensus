@@ -24,7 +24,7 @@ export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, ent
 
     const onConfirmedUpdated = () => {
         if (state.nominationTimeout) clearTimeout(state.nominationTimeout);
-        log('Confirmed: ', state.confirmedValues.sort().join(' '))
+        log('Confirmed Nominates: ', state.confirmedValues.sort().join(' '))
         if (state.phase === 'NOMINATE') {
             enterPreparePhase();
         }

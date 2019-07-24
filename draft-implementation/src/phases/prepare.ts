@@ -9,15 +9,17 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     const log = (...args: any[]) => state.log(...args);
 
     const acceptPrepareBallot = (b: ScpBallot) => {
-        const h = hashBallot(b);
-        if (!state.acceptedPrepared.find(x => hashBallot(x) === h)) {
+        if(state.addAcceptedPrepared(b)){
             log('ACCEPT prepare ballot', b.counter, b.value.join(' '));
-            // log(b.value.join(' '))
-            state.acceptedPrepared.push(b);
+
         }
-        if (state.prepare.prepared === null || isBallotLower(state.prepare.prepared, b)) {
-            state.prepare.prepared = b;
-        }
+        // if (!state.acceptedPrepared.find(x => hashBallot(x) === h)) {
+        //     state.acceptedPrepared.push(b);
+        // }
+        // if (state.prepare.prepared === null || isBallotLower(state.prepare.prepared, b)) {
+        //     state.prepare.prepared = b;
+        // }
+        // TODO: Use this?
         if (isBallotLower(state.prepare.ballot, b)) {
             state.prepare.ballot = b;
         }
@@ -32,30 +34,45 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     }
 
     const checkPrepareBallotAccept = (ballot: ScpBallot) => {
-        // FIXME: Node accepts higher ballot but sends lesser prepared in message
+        // state.log('checkPrepareBallotAccept', ballot)
         // FIXME: What if we're already at another ballot
         // Track other ballots
         // TODO: include all the messages from above
         const ballotHash = hashBallot(ballot);
+        const ballotValueHash = hashBallotValue(ballot)
         const voteOrAccept = state.prepareStorage.getAllValuesAsArary()
             .filter(p => hashBallot(p.ballot) === ballotHash || (p.prepared && hashBallot(p.prepared) === ballotHash))
-            .map(p => p.node);
-        if (quorumThreshold(state.nodeSliceMap, voteOrAccept, state.options.self)) {
+        const commitVotes = state.commitStorage.getAllValuesAsArary()
+            .filter(c => c.ballot && hashBallotValue(c.ballot) === ballotValueHash);
+        const externalizeVotes = state.externalizeStorage.getAllValuesAsArary()
+            .filter(e => e.commit && hashBallotValue(e.commit) === ballotValueHash);
+        // state.log('For Quorum: ', { prepare: voteOrAccept.map(x => x.node), commit: commitVotes.map(x => x.node), ext: externalizeVotes.map(x => x.node) })
+        const signers = [...voteOrAccept, ...commitVotes, ...externalizeVotes].map(p => p.node);
+        if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
+            log('Found quorum for ', ballot);
             acceptPrepareBallot(ballot);
+            return;
         }
+
+        const commitAccepts = state.commitStorage.getAllValuesAsArary()
+            .filter(c => c.ballot && hashBallot({ counter: c.preparedCounter, value: c.ballot.value }) === ballotHash);
+        const externalizes = state.externalizeStorage.getAllValuesAsArary()
+            .filter(e => e.commit && hashBallotValue(e.commit) === ballotValueHash);
         const acceptPrepares = state.prepareStorage.getAllValuesAsArary()
             .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash);
-        const commits = state.commitStorage.getAllValuesAsArary()
-            .filter(c => c.ballot && hashBallot(c.ballot) === ballotHash);
-        const externalizes = state.externalizeStorage.getAllValuesAsArary()
-            .filter(e => e.commit && hashBallot(e.commit) === ballotHash);
-        const nodes = [...acceptPrepares, ...commits, ...externalizes].map(p => p.node);
+        // state.log('For Blockingset: ', { prepare: acceptPrepares.map(x => x.node), commit: commitAccepts.map(x => x.node), ext: externalizes.map(x => x.node) })
+        const nodes = [...acceptPrepares, ...commitAccepts, ...externalizes].map(p => p.node);
         if (blockingThreshold(state.options.slices, nodes)) {
+            log('Found blocking set for ', ballot);
             acceptPrepareBallot(ballot);
         }
     }
 
     const checkPrepareBallotConfirm = (ballot: ScpBallot) => {
+        // state.log('checkPrepareBallotConfirm', ballot)
+        // if (state.options.self === 'B') {
+        //     state.log(JSON.stringify([state.prepareStorage.getAllValuesAsArary(), state.commitStorage.getAllValuesAsArary(), state.externalizeStorage.getAllValuesAsArary()], null, 2))
+        // }
         // FIXME: include other messages
         const ballotHash = hashBallot(ballot);
         const acceptPrepares = state.prepareStorage.getAllValuesAsArary()
@@ -67,6 +84,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         const externalizes = state.externalizeStorage.getAllValuesAsArary()
             .filter(e => hashBallotValue(e.commit) === hashBallotValue(ballot))
             .map(e => e.node);
+        // state.log({ acceptPrepares, commits, externalizes })
         const signers = _.uniq([...acceptPrepares, ...commits, ...externalizes]);
         if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
             confirmPrepareBallot(ballot);
@@ -82,7 +100,6 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         if (highestConfirmed) {
             log('found highest confirmed')
             state.prepare.ballot.value = highestConfirmed.value;
-            enterCommitPhase();
             return;
         }
         // Otherwise (if no such "h" exists), if one or more values are
@@ -109,23 +126,36 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     }
 
     const recalculatePreparedField = (): void => {
+        // log('Accepted prepared', state.acceptedPrepared);
+        
         //  or NULL if no ballot has been accepted prepared. 
-        if (state.acceptedPrepared.length === 0) state.prepare.prepared = null;
+        // if (state.acceptedPrepared.length === 0) state.prepare.prepared = null;
         // The highest accepted prepared ballot not exceeding the "ballot" field
-        const ballotsLowerThanPrepare = state.acceptedPrepared.filter(b => isBallotLower(b, state.prepare.ballot))
-        if (ballotsLowerThanPrepare.length) {
-
-            const highestAcceptedPreparedBallotNotExceedingBallotField =
-                ballotsLowerThanPrepare.reduce((acc, b) => {
-                    if (isBallotLower(acc, b)) acc = b;
-                    return acc;
-                })
-            state.prepare.prepared = highestAcceptedPreparedBallotNotExceedingBallotField!;
-            if (state.prepare.ballot.value.length < state.prepare.prepared.value.length && state.prepare.ballot.counter === state.prepare.prepared.counter) {
-                state.prepare.prepared.counter = state.prepare.ballot.counter - 1;
-                // Note:  it is not possible to vote to commit a ballot with counter 0.
-            }
+        const highest = state.getHighestAcceptedPreparedBallot();
+        if (!highest) {
+            state.prepare.prepared = null;
+            return;
         }
+        if (isBallotLower(state.prepare.ballot, highest)) {
+            state.prepare.prepared = { value: highest.value, counter: state.prepare.ballot.counter - 1 }
+        }
+        else {
+            state.prepare.prepared = highest;
+        }
+        log('Set prepare field to ', state.prepare.prepared)
+        // const ballotsLowerOrEqualThanPrepare = state.acceptedPrepared.filter(b => isBallotLowerOrEqual(b, state.prepare.ballot))
+        // if (ballotsLowerOrEqualThanPrepare.length) {
+        //     const highestAcceptedPreparedBallotNotExceedingBallotField =
+        //         ballotsLowerOrEqualThanPrepare.reduce((acc, b) => {
+        //             if (isBallotLower(acc, b)) acc = b;
+        //             return acc;
+        //         })
+        //     state.prepare.prepared = highestAcceptedPreparedBallotNotExceedingBallotField!;
+        //     if (state.prepare.ballot.value.length < state.prepare.prepared.value.length && state.prepare.ballot.counter === state.prepare.prepared.counter) {
+        //         state.prepare.prepared.counter = state.prepare.ballot.counter - 1;
+        //         // Note:  it is not possible to vote to commit a ballot with counter 0.
+        //     }
+        // }
     }
 
     const recalculateACounter = (oldPrepared: ScpBallot | null) => {
@@ -166,6 +196,11 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         else { state.prepare.cCounter = state.commitBallot.counter; }
     }
 
+    const onBallotCounterChange = () => {
+        // FIXME: execute when timer fires
+        recalculatePrepareBallotValue();
+    }
+
     const sendPrepareMessage = () => {
         const msg: ScpPrepareEnvelope = {
             message: state.prepare,
@@ -178,6 +213,9 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     }
 
     const checkEnterCommitPhase = () => {
+        // FIXME: A node leaves the PREPARE phase and proceeds to the COMMIT phase when
+        // there is some ballot "b" for which the node confirms "prepare(b)" and
+        // accepts "commit(b)"
         if (state.confirmedPrepared.length) {
             enterCommitPhase();
         }
@@ -202,10 +240,10 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
             }
 
             const currentCounter = state.prepare.ballot.counter;
-            checkQuorumForCounter(state, () => state.prepare.ballot.counter++);
+            checkQuorumForCounter(state, () => state.prepare.ballot.counter++, onBallotCounterChange);
             checkBlockingSetForCounter(state, (value: number) => state.prepare.ballot.counter = value);
             if (state.prepare.ballot.counter !== currentCounter) {
-                recalculatePrepareBallotValue();
+                onBallotCounterChange();
             }
             const oldPrepared = state.prepare.prepared;
             recalculatePreparedField();

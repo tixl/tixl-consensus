@@ -9,10 +9,10 @@ import { envelopeFormatter } from './formatters';
 import chalk from 'chalk';
 
 const chance = new Chance('Iamaseed');
-const enableLog = false;
-const startSlot = 1;
-const runs = 100;
-const delay = { min: 0, max: 0 };
+const enableLog = true;
+const startSlot = 15;
+const runs = 10;
+const delay = { min: 1000, max: 5000 };
 const determineEndInterval = 1000;
 
 const cfgFile = fs.readFileSync('./src/config.toml', "utf8");
@@ -31,7 +31,7 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
     const evt = new EventEmitter();
     const broadcast: BroadcastFunction = (envelope: MessageEnvelope) => {
         if (chance.bool({ likelihood: 100 })) {
-            console.log(chalk.green(`Node ${chalk.bold(envelope.sender)} sends    `), envelopeFormatter(envelope));
+            console.log(chalk.green(`${slot} Node ${chalk.bold(envelope.sender)} sends    `), envelopeFormatter(envelope));
             // console.log(envelopeFormatter(envelope));
             msgCounter++;
             evt.emit('broadcast', JSON.stringify(envelope))
@@ -80,7 +80,7 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
             const envelope: MessageEnvelope = JSON.parse(e);
             setTimeout(() => {
                 const formatted = envelopeFormatter(envelope);
-                console.log(chalk.red(`Node ${chalk.bold((node as any).pk)} receives `), formatted);
+                console.log(chalk.red(`${slot} Node ${chalk.bold((node as any).pk)} receives `), formatted);
                 receive(envelope);
 
             }, chance.integer(delay));
@@ -91,7 +91,9 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
         setTimeout(() => {
             if (inits.length === externalizedNodes.length) {
                 console.log({ msgCounter, externalizedNodes })
-                resolve();
+                setTimeout(() => {
+                    resolve();
+                }, 5000)
             }
             else {
                 logInfo();
@@ -101,21 +103,21 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
     logInfo();
 })
 
-const main = () => {
+const main = async () => {
     let i = startSlot;
     const runSCP = async () => {
         try {
-            await wrapSCP(i)
+            await wrapSCP(15)
         }
         catch (error) {
             console.error(error);
         }
         if (i <= runs + startSlot) {
             i++;
-            runSCP();
+            await runSCP();
         }
     }
-    runSCP();
+    await runSCP();
 }
 
 main();

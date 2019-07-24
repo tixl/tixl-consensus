@@ -1,7 +1,7 @@
 import { PublicKey, ScpSlices, ScpPrepare, ScpCommit, ScpExternalize, ScpBallot, ScpNominate, Value } from "./types";
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { GenericStorage } from './GenericStorage';
-import { isBallotLower } from "./helpers";
+import { isBallotLower, hashBallot } from "./helpers";
 import { ProtocolOptions } from "./protocol";
 
 export type ProtocolPhase = 'NOMINATE' | 'PREPARE' | 'COMMIT' | 'EXTERNALIZE';
@@ -100,5 +100,14 @@ export default class ProtocolState {
             return highestAccepted;
         }
         return null;
+    }
+
+    addAcceptedPrepared(b: ScpBallot) {
+        const h = hashBallot(b);
+        if (this.acceptedPrepared.map(hashBallot).indexOf(h) < 0) {
+            this.acceptedPrepared.push(b)
+            return true;
+        }
+        return false;
     }
 }

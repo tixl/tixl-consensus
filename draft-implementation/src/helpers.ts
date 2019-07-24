@@ -10,11 +10,15 @@ export const isBallotLower = (a: ScpBallot, b: ScpBallot) => {
     return a.counter < b.counter || ((a.counter === b.counter) && a.value.length < b.value.length);
 }
 
+export const isBallotLowerOrEqual = (a: ScpBallot, b: ScpBallot) => {
+    return isBallotLower(a,b) || (a.counter === b.counter && a.value.length === b.value.length)
+}
+
 export const hash = (x: any) => sha256(JSON.stringify(x));
 export const hashBallot = (b: ScpBallot) => hash({ ...b, values: b.value.sort() })
 export const hashBallotValue = (b: ScpBallot | null) => hash(b ? b.value.sort() : null)
 
-const armTimer = (state: ProtocolState, increaseFunc: () => void) => {
+const armTimer = (state: ProtocolState, increaseFunc: () => void, callback?: () => void) => {
     if (state.prepareTimeoutCounter < state.prepare.ballot.counter) {
         state.log('Arming timer for current counter ', state.prepare.ballot.counter);
         if (state.prepareTimeout) clearTimeout(state.prepareTimeout);
@@ -23,11 +27,12 @@ const armTimer = (state: ProtocolState, increaseFunc: () => void) => {
             state.log('Timer fired for counter ', state.prepare.ballot.counter);
             // FIXME: send message again
             increaseFunc();
+            callback && callback();
         }, (state.prepare.ballot.counter + 1) * 1000)
     }
 }
 
-export const checkQuorumForCounter = (state: ProtocolState, increaseFunc: () => void) => {
+export const checkQuorumForCounter = (state: ProtocolState, increaseFunc: () => void, timerCallback?: () => void) => {
     const votersFormPrepare = state.prepareStorage.getAllValuesAsArary()
         .filter(p => p.ballot.counter && (p.ballot.counter >= state.prepare.ballot.counter))
         .map(p => p.node);
@@ -37,7 +42,7 @@ export const checkQuorumForCounter = (state: ProtocolState, increaseFunc: () => 
     const votersFromExternalize = state.externalizeStorage.getAllValuesAsArary().map(p => p.node);
     const votersWithCounterEqualOrAbove = _.uniq([...votersFormPrepare, ...votersFromCommit, ...votersFromExternalize]);
     const isQuorum = quorumThreshold(state.nodeSliceMap, votersWithCounterEqualOrAbove, state.options.self);
-    if (isQuorum) armTimer(state, increaseFunc);
+    if (isQuorum) armTimer(state, increaseFunc, timerCallback);
 }
 
 export const checkBlockingSetForCounter = (state: ProtocolState, setFunc: (value: number) => void) => {
