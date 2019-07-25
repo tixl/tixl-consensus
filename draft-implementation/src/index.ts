@@ -9,11 +9,11 @@ import { envelopeFormatter } from './formatters';
 import chalk from 'chalk';
 
 const chance = new Chance('Iamaseed');
-const enableLog = true;
-const startSlot = 15;
-const runs = 10;
+const enableLog = false;
+const startSlot = 2 //25
+const runs = 50;
 const delay = { min: 1000, max: 5000 };
-const determineEndInterval = 1000;
+const determineEndInterval = 500;
 
 const cfgFile = fs.readFileSync('./src/config.toml', "utf8");
 const config = toml.parse(cfgFile)
@@ -93,7 +93,7 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
                 console.log({ msgCounter, externalizedNodes })
                 setTimeout(() => {
                     resolve();
-                }, 5000)
+                }, delay.max)
             }
             else {
                 logInfo();
@@ -106,12 +106,7 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
 const main = async () => {
     let i = startSlot;
     const runSCP = async () => {
-        try {
-            await wrapSCP(15)
-        }
-        catch (error) {
-            console.error(error);
-        }
+        await wrapSCP(i)
         if (i <= runs + startSlot) {
             i++;
             await runSCP();

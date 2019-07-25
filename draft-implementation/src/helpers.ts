@@ -4,14 +4,14 @@ import ProtocolState from './ProtocolState';
 import * as _ from 'lodash';
 import { blockingThreshold, quorumThreshold } from './validateSlices';
 
-const maxVal = 100000;
+export const infinityCounter = 100000;
 
 export const isBallotLower = (a: ScpBallot, b: ScpBallot) => {
     return a.counter < b.counter || ((a.counter === b.counter) && a.value.length < b.value.length);
 }
 
 export const isBallotLowerOrEqual = (a: ScpBallot, b: ScpBallot) => {
-    return isBallotLower(a,b) || (a.counter === b.counter && a.value.length === b.value.length)
+    return isBallotLower(a, b) || (a.counter === b.counter && a.value.length === b.value.length)
 }
 
 export const hash = (x: any) => sha256(JSON.stringify(x));
@@ -45,7 +45,7 @@ export const checkQuorumForCounter = (state: ProtocolState, increaseFunc: () => 
     if (isQuorum) armTimer(state, increaseFunc, timerCallback);
 }
 
-export const checkBlockingSetForCounter = (state: ProtocolState, setFunc: (value: number) => void) => {
+export const checkBlockingSetForCounterPrepare = (state: ProtocolState, setFunc: (value: number) => void) => {
     const preparesWithCounterAbove = state.prepareStorage.getAllValuesAsArary()
         .filter(p => p.ballot.counter > state.prepare.ballot.counter);
     const commitsWithCounterAbove = state.commitStorage.getAllValuesAsArary()
@@ -55,14 +55,41 @@ export const checkBlockingSetForCounter = (state: ProtocolState, setFunc: (value
     const isBlockingSet = blockingThreshold(state.options.slices, nodesWithCounterAbove);
     if (isBlockingSet) {
         const counters = [...preparesWithCounterAbove.map(p => p.ballot.counter), ...commitsWithCounterAbove.map(p => p.ballot.counter)];
-        const lowestCounter = Math.min(...counters, maxVal);
-        state.log('Found a blocking set with lowest counter ', lowestCounter)
+        const lowestCounter = Math.min(...counters, infinityCounter);
+        state.log('Found a blocking set with lowest counter ', lowestCounter, nodesWithCounterAbove)
         if (state.prepareTimeout) clearTimeout(state.prepareTimeout);
         setFunc(lowestCounter);
         // TODO: Rework this step, this might be inefficient
         let findsAnotherBlockingSet = false;
-        if (lowestCounter !== maxVal) {
-            findsAnotherBlockingSet = checkBlockingSetForCounter(state, setFunc);
+        if (lowestCounter !== infinityCounter) {
+            findsAnotherBlockingSet = checkBlockingSetForCounterPrepare(state, setFunc);
+        }
+        if (!findsAnotherBlockingSet) {
+            checkQuorumForCounter(state, () => state.prepare.ballot.counter++);
+        }
+        return true;
+    }
+    return false;
+}
+
+export const checkBlockingSetForCounterCommit = (state: ProtocolState, setFunc: (value: number) => void) => {
+    const preparesWithCounterAbove = state.prepareStorage.getAllValuesAsArary()
+        .filter(p => p.ballot.counter > state.commit.ballot.counter);
+    const commitsWithCounterAbove = state.commitStorage.getAllValuesAsArary()
+        .filter(p => p.ballot.counter > state.commit.ballot.counter);
+    const externalizesWithCounterAbove = state.externalizeStorage.getAllValuesAsArary(); // externalize implicitly has counter Infinity
+    const nodesWithCounterAbove = _.uniq([...preparesWithCounterAbove, ...commitsWithCounterAbove, ...externalizesWithCounterAbove].map(x => x.node));
+    const isBlockingSet = blockingThreshold(state.options.slices, nodesWithCounterAbove);
+    if (isBlockingSet) {
+        const counters = [...preparesWithCounterAbove.map(p => p.ballot.counter), ...commitsWithCounterAbove.map(p => p.ballot.counter)];
+        const lowestCounter = Math.min(...counters, infinityCounter);
+        state.log('Found a blocking set with lowest counter ', lowestCounter, nodesWithCounterAbove)
+        if (state.prepareTimeout) clearTimeout(state.prepareTimeout);
+        setFunc(lowestCounter);
+        // TODO: Rework this step, this might be inefficient
+        let findsAnotherBlockingSet = false;
+        if (lowestCounter !== infinityCounter) {
+            findsAnotherBlockingSet = checkBlockingSetForCounterCommit(state, setFunc);
         }
         if (!findsAnotherBlockingSet) {
             checkQuorumForCounter(state, () => state.prepare.ballot.counter++);

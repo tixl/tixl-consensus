@@ -1,75 +1,85 @@
 import { ScpCommitEnvelope, ScpBallot } from "../types";
 import { BroadcastFunction } from "../protocol";
 import ProtocolState from '../ProtocolState';
-import { hashBallot, hashBallotValue, checkQuorumForCounter, checkBlockingSetForCounter } from "../helpers";
-import { quorumThreshold, blockingThreshold } from "../validateSlices";
+import { hashBallot, hashBallotValue, checkBlockingSetForCounterCommit, isBallotLower, checkQuorumForCounter } from "../helpers";
+import { quorumThreshold } from "../validateSlices";
 import * as _ from 'lodash';
 
 
 export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enterExternalizePhase: () => void) => {
     const log = (...args: any[]) => state.log(...args);
 
-    const acceptCommitBallot = (ballot: ScpBallot) => {
-        const h = hashBallot(ballot);
-        if (!state.acceptedCommitted.find(x => hashBallot(x) !== h)) {
-            state.acceptedCommitted.push(ballot)
-        }
-    }
+    // const acceptCommitBallot = (ballot: ScpBallot) => {
+    //     const h = hashBallot(ballot);
+    //     if (!state.acceptedCommitted.find(x => hashBallot(x) !== h)) {
+    //         state.acceptedCommitted.push(ballot)
+    //     }
+    // }
 
     const confirmCommitBallot = (ballot: ScpBallot) => {
         const h = hashBallot(ballot);
-        if (state.confirmedCommitted.find(x => hashBallot(x) === h) === undefined) {
+        if (state.confirmedCommitted.map(hashBallot).indexOf(h) < 0) {
             log('!!!!!!!!!!!!!!!!!!!!!!!!!!')
             log('CONFIRMED BALLOT ', ballot.counter, ballot.value.join(' '))
             state.confirmedCommitted.push(ballot)
         }
     }
 
-    const checkCommitBallotAccept = () => {
-        const votesOrAccepts = state.commitStorage.getAllValuesAsArary()
-            .filter(c =>
-                // accepts
-                (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && (c.cCounter >= state.commit.ballot.counter && c.hCounter <= state.commit.ballot.counter))
-                // votes
-                || (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && state.commit.ballot.counter >= c.cCounter)
-            ).map(c => c.node);
-        if (quorumThreshold(state.nodeSliceMap, votesOrAccepts, state.options.self)) {
-            acceptCommitBallot(state.commit.ballot);
-        }
-        const accepts = state.commitStorage.getAllValuesAsArary()
-            .filter(c =>
-                // accepts
-                (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && (c.cCounter >= state.commit.ballot.counter && c.hCounter <= state.commit.ballot.counter))
-            ).map(c => c.node);
-        if (blockingThreshold(state.options.slices, accepts)) {
-            acceptCommitBallot(state.commit.ballot);
-        }
-    }
+    // const checkCommitBallotAccept = () => {
+    //     const n = state.commit.ballot.counter;
+    //     const votesOrAccepts = state.commitStorage.getAllValuesAsArary()
+    //         .filter(c =>
+    //             // accepts
+    //             (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && (c.cCounter >= state.commit.ballot.counter && c.hCounter <= state.commit.ballot.counter))
+    //             // votes
+    //             || (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && n >= c.cCounter)
+    //         ).map(c => c.node);
+    //     if (quorumThreshold(state.nodeSliceMap, votesOrAccepts, state.options.self)) {
+    //         acceptCommitBallot(state.commit.ballot);
+    //     }
+    //     const accepts = state.commitStorage.getAllValuesAsArary()
+    //         .filter(c =>
+    //             // accepts
+    //             (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && (c.cCounter <= n && n <= c.hCounter))
+    //         ).map(c => c.node);
+    //     if (blockingThreshold(state.options.slices, accepts)) {
+    //         acceptCommitBallot(state.commit.ballot);
+    //     }
+    // }
 
     const checkCommitBallotConfirm = () => {
-        const accepts = state.commitStorage.getAllValuesAsArary()
+        const n = state.commit.ballot.counter;
+        const ballotValueHash = hashBallotValue(state.commit.ballot);
+        const acceptCommits = state.commitStorage.getAllValuesAsArary()
             .filter(c =>
                 // accepts
-                (hashBallotValue(c.ballot) === hashBallotValue(state.commit.ballot) && (c.cCounter >= state.commit.ballot.counter && c.hCounter <= state.commit.ballot.counter))
-            ).map(c => c.node);
-        if (quorumThreshold(state.nodeSliceMap, accepts, state.options.self)) {
+                (hashBallotValue(c.ballot) === ballotValueHash && (c.cCounter <= n && n <= c.hCounter))
+            )
+        const externalizes = state.externalizeStorage.getAllValuesAsArary()
+            .filter(x => hashBallotValue(x.commit) === ballotValueHash);
+        const signers = [...acceptCommits, ...externalizes].map(x => x.node);
+        if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
             confirmCommitBallot(state.commit.ballot);
         }
     }
 
     const recalculatePreparedCounter = () => {
         // TODO: Check if this is complete / right
-        const highestAccepted = state.getHighestAcceptedPreparedBallot()
-        if (highestAccepted) {
-            state.commit.preparedCounter = highestAccepted.counter;
+        const highest = state.getHighestAcceptedPreparedBallot();
+        if (isBallotLower(state.commit.ballot, highest!)) {
+            state.commit.preparedCounter = state.commit.ballot.counter - 1;
         }
+        else {
+            state.commit.preparedCounter = highest!.counter;
+        }
+        log('Set prepare counter to ', state.commit.preparedCounter)
     }
 
     const recalculateCommitCCounter = () => {
         // TODO: how to set this when no ballots in acceptedCommited
         if (state.acceptedCommitted.length) {
             const min = Math.min(...state.acceptedCommitted.map(x => x.counter))
-            state.commit.cCounter = min;
+            state.commit.cCounter = _.cloneDeep(min);
         }
         else {
             state.commit.cCounter = 0;
@@ -78,8 +88,9 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
     }
 
     const recalculateCommitHCounter = () => {
+        log('acceptedCommittted', state.acceptedCommitted.map(x => `<${x.counter},${x.value.join('-')}>`))
         const max = Math.max(...state.acceptedCommitted.map(x => x.counter), 0)
-        state.commit.hCounter = max;
+        state.commit.hCounter = _.cloneDeep(max);
     }
 
     const sendCommitMessage = () => {
@@ -94,33 +105,44 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
     }
 
     const checkEnterExternalizePhase = () => {
-        if (confirmCommitBallot.length) {
+        if (state.confirmedCommitted.length) {
             enterExternalizePhase();
         }
     }
 
     const enterCommitPhase = () => {
-        log('Entering Commit Phase')
         state.phase = "COMMIT";
-        state.commit.ballot = state.prepare.ballot;
+        if(state.acceptedCommitted.length === 0){
+            throw new Error('must have an accepted commited ballot to enter commit phase')
+        }
+        if (!state.prepare.prepared) {
+            throw new Error('Should not be empty')
+        }
+        log('Entering Commit Phase')
+        state.commit.ballot = _.cloneDeep(state.prepare.prepared);
         state.commit.preparedCounter = state.prepare.prepared!.counter;
         sendCommitMessage();
     }
 
     const receiveCommit = (envelope: ScpCommitEnvelope) => {
         state.commitStorage.set(envelope.sender, envelope.message, envelope.timestamp);
-        checkCommitBallotAccept();
-        checkCommitBallotConfirm();
-        if (state.phase === 'COMMIT') {
-            checkQuorumForCounter(state, () => state.commit.ballot.counter++);
-            checkBlockingSetForCounter(state, (value: number) => state.commit.ballot.counter = value);
-            recalculatePreparedCounter();
-            recalculateCommitCCounter();
-            recalculateCommitHCounter();
-            sendCommitMessage();
-            checkEnterExternalizePhase();
-        }
+
     }
 
-    return { receiveCommit, enterCommitPhase }
+    const doCommitUpdate = () => {
+        // checkCommitBallotAccept();
+        checkCommitBallotConfirm();
+        checkQuorumForCounter(state, () => {
+            state.commit.ballot.counter++
+            doCommitUpdate();
+        });
+        checkBlockingSetForCounterCommit(state, (value: number) => state.commit.ballot.counter = _.cloneDeep(value));
+        recalculatePreparedCounter();
+        recalculateCommitCCounter();
+        recalculateCommitHCounter();
+        sendCommitMessage();
+        checkEnterExternalizePhase();
+    }
+
+    return { receiveCommit, enterCommitPhase, doCommitUpdate }
 }

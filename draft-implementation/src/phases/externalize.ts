@@ -19,11 +19,12 @@ export const externalize = (state: ProtocolState, broadcast: BroadcastFunction) 
     }
 
     const enterExternalizePhase = () => {
-        //TODO: abort counters
+        state.prepareTimeout && clearTimeout(state.prepareTimeout);
+        state.nominationTimeout && clearTimeout(state.nominationTimeout);
         state.phase = "EXTERNALIZE";
         state.log('entering EXTERNALIZE phase');
-        state.externalize.commit = state.commit.ballot;
-        state.externalize.hCounter = state.commit.ballot.counter;
+        state.externalize.commit = _.cloneDeep(state.commit.ballot);
+        state.externalize.hCounter = _.cloneDeep(state.commit.ballot.counter);
         sendExternalizeMessage();
     }
 

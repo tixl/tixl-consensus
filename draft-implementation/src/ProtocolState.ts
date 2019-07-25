@@ -1,4 +1,4 @@
-import { PublicKey, ScpSlices, ScpPrepare, ScpCommit, ScpExternalize, ScpBallot, ScpNominate, Value } from "./types";
+import { PublicKey, ScpSlices, ScpPrepare, ScpCommit, ScpExternalize, ScpBallot, ScpNominate, Value, ScpPrepareEnvelope } from "./types";
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { GenericStorage } from './GenericStorage';
 import { isBallotLower, hashBallot } from "./helpers";
@@ -20,6 +20,7 @@ export default class ProtocolState {
     prepareStorage: GenericStorage<ScpPrepare>;
     commitStorage: GenericStorage<ScpCommit>;
     externalizeStorage: GenericStorage<ScpExternalize>;
+    lastReceivedPrepareEnvelope: null | ScpPrepareEnvelope;
     acceptedPrepared: ScpBallot[];
     confirmedPrepared: ScpBallot[];
     acceptedCommitted: ScpBallot[];
@@ -47,6 +48,7 @@ export default class ProtocolState {
         this.prepareStorage = new GenericStorage<ScpPrepare>();
         this.commitStorage = new GenericStorage<ScpCommit>();
         this.externalizeStorage = new GenericStorage<ScpExternalize>();
+        this.lastReceivedPrepareEnvelope = null;
         this.acceptedPrepared = [];
         this.confirmedPrepared = [];
         this.acceptedCommitted = [];
@@ -105,7 +107,25 @@ export default class ProtocolState {
     addAcceptedPrepared(b: ScpBallot) {
         const h = hashBallot(b);
         if (this.acceptedPrepared.map(hashBallot).indexOf(h) < 0) {
-            this.acceptedPrepared.push(b)
+            this.acceptedPrepared.push(b);
+            return true;
+        }
+        return false;
+    }
+
+    addConfirmedPrepared(b: ScpBallot) {
+        const h = hashBallot(b);
+        if (this.confirmedPrepared.map(hashBallot).indexOf(h) < 0) {
+            this.confirmedPrepared.push(b);
+            return true;
+        }
+        return false;
+    }
+
+    addAcceptedCommited(b: ScpBallot) {
+        const h = hashBallot(b);
+        if (this.acceptedCommitted.map(hashBallot).indexOf(h) < 0) {
+            this.acceptedCommitted.push(b);
             return true;
         }
         return false;
