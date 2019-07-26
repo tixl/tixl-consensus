@@ -19,7 +19,8 @@ export const hashBallot = (b: ScpBallot) => hash({ ...b, values: b.value.sort() 
 export const hashBallotValue = (b: ScpBallot | null) => hash(b ? b.value.sort() : null)
 
 const armTimer = (state: ProtocolState, increaseFunc: () => void, callback?: () => void) => {
-    if (state.prepareTimeoutCounter < state.prepare.ballot.counter) {
+    const currentCounter = state.phase === 'PREPARE' ? state.prepare.ballot.counter: state.commit.ballot.counter;
+    if (state.prepareTimeoutCounter < currentCounter) {
         state.log('Arming timer for current counter ', state.prepare.ballot.counter);
         if (state.prepareTimeout) clearTimeout(state.prepareTimeout);
         state.prepareTimeoutCounter = state.prepare.ballot.counter;
@@ -28,16 +29,16 @@ const armTimer = (state: ProtocolState, increaseFunc: () => void, callback?: () 
             // FIXME: send message again
             increaseFunc();
             callback && callback();
-        }, (state.prepare.ballot.counter + 1) * 1000)
+        }, (currentCounter+ 1) * 1000)
     }
 }
 
 export const checkQuorumForCounter = (state: ProtocolState, increaseFunc: () => void, timerCallback?: () => void) => {
     const votersFormPrepare = state.prepareStorage.getAllValuesAsArary()
-        .filter(p => p.ballot.counter && (p.ballot.counter >= state.prepare.ballot.counter))
+        .filter(p => p.ballot.counter && ((state.phase === 'PREPARE' && (p.ballot.counter >= state.prepare.ballot.counter)) || (state.phase === 'COMMIT' && p.ballot.counter >= state.commit.ballot.counter)))
         .map(p => p.node);
     const votersFromCommit = state.commitStorage.getAllValuesAsArary()
-        .filter(p => p.ballot.counter && (p.ballot.counter >= state.prepare.ballot.counter))
+        .filter(p => p.ballot.counter && ((state.phase === 'PREPARE' && (p.ballot.counter >= state.prepare.ballot.counter)) || (state.phase === 'COMMIT' && p.ballot.counter >= state.commit.ballot.counter)))
         .map(p => p.node);
     const votersFromExternalize = state.externalizeStorage.getAllValuesAsArary().map(p => p.node);
     const votersWithCounterEqualOrAbove = _.uniq([...votersFormPrepare, ...votersFromCommit, ...votersFromExternalize]);

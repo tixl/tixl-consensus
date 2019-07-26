@@ -263,9 +263,6 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     const receivePrepare = (envelope: ScpPrepareEnvelope) => {
         state.prepareStorage.set(envelope.sender, envelope.message, envelope.timestamp);
         state.lastReceivedPrepareEnvelope = _.cloneDeep(envelope);
-    }
-
-    const doPrepareUpdate = () => {
         checkPrepareBallotAcceptQuorum(state.prepare.ballot);
         checkPrepareBallotAcceptBlockingSet(state.prepare.ballot);
         if (state.lastReceivedPrepareEnvelope) {
@@ -275,7 +272,10 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         if (state.prepare.prepared) {
             checkPrepareBallotConfirm(state.prepare.prepared);
         }
+        checkPrepareBallotAcceptCommit();
+    }
 
+    const doPrepareUpdate = () => {
         const currentCounter = state.prepare.ballot.counter;
         checkQuorumForCounter(state, () => state.prepare.ballot.counter = state.prepare.ballot.counter + 1, () => {
             onBallotCounterChange();
@@ -285,6 +285,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         if (state.prepare.ballot.counter !== currentCounter) {
             log(`Counter changed from ${currentCounter} to ${state.prepare.ballot.counter}`)
             onBallotCounterChange();
+            doPrepareUpdate();
         }
         const oldPrepared = _.cloneDeep(state.prepare.prepared);
         recalculatePreparedField();
@@ -293,7 +294,6 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         }
         recalculateHCounter();
         recalculateCCounter();
-        checkPrepareBallotAcceptCommit();
         sendPrepareMessage();
         checkEnterCommitPhase();
     }
