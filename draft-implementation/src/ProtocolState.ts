@@ -10,7 +10,7 @@ export type ProtocolPhase = 'NOMINATE' | 'PREPARE' | 'COMMIT' | 'EXTERNALIZE';
 export default class ProtocolState {
     phase: ProtocolPhase;
     nominationTimeout: NodeJS.Timeout | null;
-    prepareTimeout: NodeJS.Timeout | null;
+    counterTimeout: NodeJS.Timeout | null;
     prepareTimeoutCounter: number;
     nominationRound: number;
     priorityNodes: PublicKey[];
@@ -37,7 +37,7 @@ export default class ProtocolState {
         this.options = options;
         this.phase = 'NOMINATE';
         this.nominationTimeout = null;
-        this.prepareTimeout = null;
+        this.counterTimeout = null;
         this.prepareTimeoutCounter = 0;
         this.nominationRound = 1;
         this.priorityNodes = [];
@@ -79,7 +79,7 @@ export default class ProtocolState {
     }
 
     log(...args: any[]) {
-        this.options.enableLog && console.log(this.options.self + ': ', ...args);
+        this.options.enableLog && console.log(`${this.options.self} (${this.phase}):`, ...args);
     }
 
     getHighestConfirmedPreparedBallot() {

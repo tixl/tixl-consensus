@@ -19,7 +19,7 @@ export const externalize = (state: ProtocolState, broadcast: BroadcastFunction) 
     }
 
     const enterExternalizePhase = () => {
-        state.prepareTimeout && clearTimeout(state.prepareTimeout);
+        state.counterTimeout && clearTimeout(state.counterTimeout);
         state.nominationTimeout && clearTimeout(state.nominationTimeout);
         state.phase = "EXTERNALIZE";
         state.log('entering EXTERNALIZE phase');

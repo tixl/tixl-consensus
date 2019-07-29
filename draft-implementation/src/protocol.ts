@@ -38,8 +38,8 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
     }
 
     const { receiveExternalize, enterExternalizePhase } = externalize(state, sendEnvelope);
-    const { receiveCommit, enterCommitPhase, doCommitUpdate } = commit(state, sendEnvelope, enterExternalizePhase);
-    const { receivePrepare, enterPreparePhase, doPrepareUpdate } = prepare(state, sendEnvelope, enterCommitPhase);
+    const { receiveCommit, enterCommitPhase, doCommitUpdate, checkMessageStatesForCommit } = commit(state, sendEnvelope, enterExternalizePhase);
+    const { receivePrepare, enterPreparePhase, doPrepareUpdate, checkMessageStatesForPrepare } = prepare(state, sendEnvelope, enterCommitPhase);
     const { receiveNominate, addToVotes } = nominate(state, sendEnvelope, enterPreparePhase)
 
 
@@ -53,6 +53,8 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
             case "ScpExternalize": receiveExternalize(envelope); break;
             default: throw new Error('unknown message type')
         }
+        checkMessageStatesForPrepare();
+        checkMessageStatesForCommit();
         switch (state.phase) {
             case "COMMIT": doCommitUpdate(); break;
             case "PREPARE": doPrepareUpdate(); break;

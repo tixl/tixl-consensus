@@ -1,7 +1,7 @@
 import { ScpBallot, ScpPrepareEnvelope } from "../types";
 import { BroadcastFunction, } from "../protocol";
 import ProtocolState from '../ProtocolState';
-import { hashBallot, isBallotLower, hashBallotValue, checkQuorumForCounter, checkBlockingSetForCounterPrepare, infinityCounter } from "../helpers";
+import { hashBallot, isBallotLower, hashBallotValue, infinityCounter } from "../helpers";
 import { quorumThreshold, blockingThreshold } from "../validateSlices";
 import * as _ from 'lodash';
 
@@ -37,8 +37,9 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         const commitVotes = state.commitStorage.getAllValuesAsArary()
             .filter(c => hashBallot({ counter: infinityCounter, value: c.ballot.value }) === ballotHash || hashBallot({ counter: c.preparedCounter, value: c.ballot.value }) === ballotHash);
         const externalizeVotes = state.externalizeStorage.getAllValuesAsArary()
-            .filter(e => hashBallot({ counter: infinityCounter, value: e.commit.value }));
+            .filter(e => hashBallot({ counter: infinityCounter, value: e.commit.value }) === ballotHash);
         // state.log('For Quorum: ', { prepare: voteOrAccept.map(x => x.node), commit: commitVotes.map(x => x.node), ext: externalizeVotes.map(x => x.node) })
+        log(voteOrAccept.map(x => x.node), commitVotes.map(x => x.node), externalizeVotes.map(x => x.node))
         const signers = [...voteOrAccept, ...commitVotes, ...externalizeVotes].map(p => p.node);
         if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
             log('Prepare Accept Found quorum for ', ballot);
@@ -71,20 +72,24 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
 
     const checkPrepareBallotAcceptCommit = () => {
         if (!state.prepare.prepared) return;
-        // return if not confirmed prepared
-        if (state.confirmedPrepared.map(hashBallot).indexOf(hashBallot(state.prepare.prepared)) < 0) return;
+        // // return if not confirmed prepared
+        // if (state.confirmedPrepared.map(hashBallot).indexOf(hashBallot(state.prepare.prepared)) < 0) return;
         const ballotValueHash = hashBallotValue(state.prepare.prepared)
         const n = state.prepare.prepared.counter;
+        // TODO: This seems to be broken
         const prepareCommitVotes = state.prepareStorage.getAllValuesAsArary()
             .filter(x => hashBallotValue(x.ballot) === ballotValueHash && (x.cCounter <= n && n <= x.hCounter));
         const commits = state.commitStorage.getAllValuesAsArary()
             // accept commit for cCounter <= n <= hCounter && vote for n >= cCounter result in no restrictions for counters 
-            .filter(x => hashBallotValue(x.ballot) === ballotValueHash);
+            .filter(x => hashBallotValue(x.ballot) === ballotValueHash && n <= x.hCounter);
         const externalizes = state.externalizeStorage.getAllValuesAsArary()
-            .filter(x => hashBallotValue(x.commit) && n >= x.commit.counter);
+            .filter(x => hashBallotValue(x.commit) === ballotValueHash && n >= x.commit.counter);
         const signersVoteOrAccept = [...prepareCommitVotes, ...commits, ...externalizes].map(x => x.node);
         if (quorumThreshold(state.nodeSliceMap, signersVoteOrAccept, state.options.self)) {
             state.addAcceptedCommited(_.cloneDeep(state.prepare.prepared!)) && log('Ballot accepted committed (QT) ', state.prepare.prepared)
+        }
+        else {
+            log('No quorum threshold for accept commit ', prepareCommitVotes.map(x => x.node), commits.map(x => x.node), externalizes.map(x => x.node));
         }
 
         const commitAccepts = state.commitStorage.getAllValuesAsArary()
@@ -116,6 +121,9 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         const signers = _.uniq([...acceptPrepares, ...commits, ...externalizes]);
         if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
             state.addConfirmedPrepared(ballot) && log('Confirmed Prepared ', ballot);
+        }
+        else {
+            log('No quorum for confirm prepared', acceptPrepares, commits, externalizes);
         }
     }
 
@@ -227,6 +235,58 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         else { state.prepare.cCounter = state.commitBallot.counter; }
     }
 
+    const checkCounterBlockingSet = () => {
+        const currentCounter = state.prepare.ballot.counter;
+        if (currentCounter === infinityCounter) return false;
+        const fromPrepare = state.prepareStorage.getAllValuesAsArary().filter(x => x.ballot.counter > currentCounter);
+        const fromCommit = state.commitStorage.getAllValuesAsArary().filter(x => x.ballot.counter > currentCounter);
+        const fromExternalize = state.externalizeStorage.getAllValuesAsArary();
+        const hasExternalizeMessage = fromExternalize.length > 0
+        const counters = [...fromPrepare.map(x => x.ballot.counter), ...fromCommit.map(x => x.ballot.counter)];
+        const nodes = [...fromPrepare, ...fromCommit, ...fromExternalize].map(x => x.node)
+        if (blockingThreshold(state.options.slices, nodes)) {
+            const minCounter = hasExternalizeMessage ? Math.min(...counters, infinityCounter) : Math.min(...counters);
+            log(`Found blocking set for timers increas from ${state.prepare.ballot.counter} to ${minCounter}`)
+            state.prepare.ballot.counter = minCounter;
+            checkCounterBlockingSet(); // do recursively
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    const armQuorumCounterTimer = () => {
+        const currentCounter = state.prepare.ballot.counter;
+        log('Arming timer for current counter ', currentCounter)
+        if (state.counterTimeout) clearTimeout(state.counterTimeout);
+        state.counterTimeout = setTimeout(() => {
+            log(`Timer fired for counter ${state.prepare.ballot.counter} - increasing to ${state.prepare.ballot.counter + 1}`)
+            state.prepare.ballot.counter++;
+            onBallotCounterChange();
+            doPrepareUpdate();
+        }, (currentCounter + 1) * 1000)
+    }
+
+    const checkCounterQuorum = () => {
+        const currentCounter = state.prepare.ballot.counter;
+        const fromPrepare = state.prepareStorage.getAllValuesAsArary().filter(x => x.ballot.counter >= currentCounter);
+        const fromCommit = state.commitStorage.getAllValuesAsArary().filter(x => x.ballot.counter >= currentCounter);
+        const fromExternalize = state.externalizeStorage.getAllValuesAsArary();
+        const nodes = [...fromPrepare, ...fromCommit, ...fromExternalize].map(x => x.node)
+        if (quorumThreshold(state.nodeSliceMap, nodes, state.options.self)) {
+            armQuorumCounterTimer();
+        }
+    }
+
+    const checkUpdateCounter = () => {
+        if (checkCounterBlockingSet()) {
+            onBallotCounterChange();
+            doPrepareUpdate();
+            state.counterTimeout && clearTimeout(state.counterTimeout)
+        }
+        checkCounterQuorum();
+    }
+
     const onBallotCounterChange = () => {
         recalculatePrepareBallotValue();
     }
@@ -258,11 +318,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         sendPrepareMessage();
     }
 
-    // TODO: Include Counter limit logic
-    // FIXME: execute this stuff when receiving message
-    const receivePrepare = (envelope: ScpPrepareEnvelope) => {
-        state.prepareStorage.set(envelope.sender, envelope.message, envelope.timestamp);
-        state.lastReceivedPrepareEnvelope = _.cloneDeep(envelope);
+    const checkMessageStatesForPrepare = () => {
         checkPrepareBallotAcceptQuorum(state.prepare.ballot);
         checkPrepareBallotAcceptBlockingSet(state.prepare.ballot);
         if (state.lastReceivedPrepareEnvelope) {
@@ -275,18 +331,16 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
         checkPrepareBallotAcceptCommit();
     }
 
+    // TODO: Include Counter limit logic
+    // FIXME: execute this stuff when receiving message
+    const receivePrepare = (envelope: ScpPrepareEnvelope) => {
+        state.prepareStorage.set(envelope.sender, envelope.message, envelope.timestamp);
+        state.lastReceivedPrepareEnvelope = _.cloneDeep(envelope);
+      
+    }
+
     const doPrepareUpdate = () => {
-        const currentCounter = state.prepare.ballot.counter;
-        checkQuorumForCounter(state, () => state.prepare.ballot.counter = state.prepare.ballot.counter + 1, () => {
-            onBallotCounterChange();
-            doPrepareUpdate();
-        });
-        checkBlockingSetForCounterPrepare(state, (value: number) => state.prepare.ballot.counter = _.cloneDeep(value));
-        if (state.prepare.ballot.counter !== currentCounter) {
-            log(`Counter changed from ${currentCounter} to ${state.prepare.ballot.counter}`)
-            onBallotCounterChange();
-            doPrepareUpdate();
-        }
+        checkUpdateCounter();
         const oldPrepared = _.cloneDeep(state.prepare.prepared);
         recalculatePreparedField();
         if (hashBallotValue(oldPrepared) !== hashBallotValue(state.prepare.prepared)) {
@@ -301,6 +355,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     return {
         receivePrepare,
         enterPreparePhase,
-        doPrepareUpdate
+        doPrepareUpdate,
+        checkMessageStatesForPrepare
     }
 }

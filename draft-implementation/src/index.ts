@@ -12,7 +12,7 @@ const chance = new Chance('Iamaseed');
 const enableLog = true;
 const startSlot = 1 //25
 const runs = 50;
-const defaultDelay = { min: 10, max: 100 };
+const defaultDelay = { min: 1000, max: 5000 };
 const determineEndInterval = 1000;
 
 const cfgFile = fs.readFileSync('./src/config.toml', "utf8");
@@ -70,7 +70,9 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
     const inits = [];
     for (const node of Object.values(nodes)) {
         i++;
-        const delayOpts = (i === 4) ? { min: 1000, max: 1100 } : defaultDelay;
+        // const delayOpts = (i === 4) ? { min: 1000, max: 1100 } : defaultDelay;
+        const delayOpts =  defaultDelay;
+
         const slices: ScpSlices = {
             threshold: (node as any).slices.t,
             validators: (node as any).slices.validators,
@@ -95,7 +97,7 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
                 console.log({ msgCounter, externalizedNodes })
                 setTimeout(() => {
                     resolve();
-                }, 1100)
+                }, 5000)
             }
             else {
                 logInfo();
