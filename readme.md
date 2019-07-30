@@ -5,7 +5,7 @@ This should be considered a prototype which is WIP. The consensus algorithm is o
 ## Installation
 1. Clone the repository
 2. `yarn` to install
-3. `yarn start` to run a simulation
+3. `yarn cli` to run a simulation
 
 You can pass command line arguments.:
 
@@ -18,7 +18,7 @@ You can pass command line arguments.:
 - `--debug true` Show advanced logs
 
 Example:  
-`yarn start -x 1000 -y 5000 --debug true`
+`yarn cli -x 1000 -y 5000 --debug true`
 
 ## Configuration
 You can define the slices of the nodes in the  `config.toml` file. Default is each four nodes A,B,C,D and each needs agreement with two other of those nodes. 
