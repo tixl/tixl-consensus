@@ -1,22 +1,13 @@
-import { ScpCommitEnvelope, ScpBallot } from "../types";
+import { ScpCommitEnvelope } from "../types";
 import { BroadcastFunction } from "../protocol";
 import ProtocolState from '../ProtocolState';
-import { hashBallot, hashBallotValue, isBallotLower, infinityCounter } from "../helpers";
+import { hashBallotValue, isBallotLower, infinityCounter } from "../helpers";
 import { quorumThreshold, blockingThreshold } from "../validateSlices";
 import * as _ from 'lodash';
 
 
 export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enterExternalizePhase: () => void) => {
     const log = (...args: any[]) => state.log(...args);
-
-    const confirmCommitBallot = (ballot: ScpBallot) => {
-        const h = hashBallot(ballot);
-        if (state.confirmedCommitted.map(hashBallot).indexOf(h) < 0) {
-            log('!!!!!!!!!!!!!!!!!!!!!!!!!!')
-            log('CONFIRMED BALLOT ', ballot.counter, ballot.value.join(' '))
-            state.confirmedCommitted.push(ballot)
-        }
-    }
 
     const checkCommitBallotAccept = () => {
         const ballot = state.commit.ballot;
@@ -31,14 +22,14 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
             .filter(x => hashBallotValue(x.commit) && n >= x.commit.counter);
         const signersVoteOrAccept = [...prepareCommitVotes, ...commits, ...externalizes].map(x => x.node);
         if (quorumThreshold(state.nodeSliceMap, signersVoteOrAccept, state.options.self)) {
-            state.addAcceptedCommited(_.cloneDeep(ballot)) && log('Ballot accepted committed (QT) ', ballot)
+            state.addAcceptedCommited(ballot) && log('Accept commit (Quorum) ', ballot)
         }
 
         const commitAccepts = state.commitStorage.getAllValuesAsArary()
             .filter(x => hashBallotValue(x.ballot) === ballotValueHash && x.cCounter <= n && n <= x.hCounter);
         const signersAccept = [...commitAccepts, ...externalizes].map(x => x.node);
         if (blockingThreshold(state.options.slices, signersAccept)) {
-            state.addAcceptedCommited(_.cloneDeep(ballot)) && log('Ballot accepted committed (BS) ', ballot)
+            state.addAcceptedCommited(ballot) && log('Accept Commit (Blocking Set)', ballot)
         }
     }
 
@@ -54,12 +45,11 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
             .filter(x => hashBallotValue(x.commit) === ballotValueHash);
         const signers = [...acceptCommits, ...externalizes].map(x => x.node);
         if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
-            confirmCommitBallot(state.commit.ballot);
+            state.addConfirmedCommited(state.commit.ballot) && log('Confirm Commit (Quorum)', state.commit.ballot)
         }
     }
 
     const recalculatePreparedCounter = () => {
-        // TODO: Check if this is complete / right
         const highest = state.getHighestAcceptedPreparedBallot();
         if (isBallotLower(state.commit.ballot, highest!)) {
             state.commit.preparedCounter = state.commit.ballot.counter - 1;
@@ -71,7 +61,6 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
     }
 
     const recalculateCommitCCounter = () => {
-        // TODO: how to set this when no ballots in acceptedCommited
         if (state.acceptedCommitted.length) {
             const min = Math.min(...state.acceptedCommitted.map(x => x.counter))
             state.commit.cCounter = _.cloneDeep(min);
@@ -88,7 +77,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
 
     const checkCounterBlockingSet = () => {
         const currentCounter = state.commit.ballot.counter;
-        if(currentCounter === infinityCounter) return false;
+        if (currentCounter === infinityCounter) return false;
         const fromPrepare = state.prepareStorage.getAllValuesAsArary().filter(x => x.ballot.counter > currentCounter);
         const fromCommit = state.commitStorage.getAllValuesAsArary().filter(x => x.ballot.counter > currentCounter);
         const fromExternalize = state.externalizeStorage.getAllValuesAsArary();
@@ -97,7 +86,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
         const nodes = [...fromPrepare, ...fromCommit, ...fromExternalize].map(x => x.node)
         if (blockingThreshold(state.options.slices, nodes)) {
             const minCounter = hasExternalizeMessage ? Math.min(...counters, infinityCounter) : Math.min(...counters);
-            log(`Found blocking set for timers increas from ${state.commit.ballot.counter} to ${minCounter}`)
+            log(`Found blocking set for timers: increase from ${state.commit.ballot.counter} to ${minCounter}`)
             state.commit.ballot.counter = minCounter;
             checkCounterBlockingSet(); // do recursively
             return true;
@@ -111,7 +100,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
         log('Arming timer for current counter ', currentCounter)
         if (state.counterTimeout) clearTimeout(state.counterTimeout);
         state.counterTimeout = setTimeout(() => {
-            log(`Timer fired for counter ${state.commit.ballot.counter} - increasing to ${state.commit.ballot.counter + 1}`)
+            log(`Timer fired for counter ${state.commit.ballot.counter}: increasing to ${state.commit.ballot.counter + 1}`)
             state.commit.ballot.counter++;
             doCommitUpdate();
         }, (currentCounter + 1) * 1000)
@@ -177,7 +166,6 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
     }
 
     const doCommitUpdate = () => {
-        // checkCommitBallotAccept();
         checkUpdateCounter();
         recalculatePreparedCounter();
         recalculateCommitCCounter();

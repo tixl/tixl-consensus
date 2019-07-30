@@ -53,8 +53,10 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
             case "ScpExternalize": receiveExternalize(envelope); break;
             default: throw new Error('unknown message type')
         }
-        checkMessageStatesForPrepare();
-        checkMessageStatesForCommit();
+        if (state.phase !== 'NOMINATE') {
+            checkMessageStatesForPrepare();
+            checkMessageStatesForCommit();
+        }
         switch (state.phase) {
             case "COMMIT": doCommitUpdate(); break;
             case "PREPARE": doPrepareUpdate(); break;

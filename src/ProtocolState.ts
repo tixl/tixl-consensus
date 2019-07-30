@@ -3,6 +3,7 @@ import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { GenericStorage } from './GenericStorage';
 import { isBallotLower, hashBallot } from "./helpers";
 import { ProtocolOptions } from "./protocol";
+import * as _ from 'lodash';
 
 export type ProtocolPhase = 'NOMINATE' | 'PREPARE' | 'COMMIT' | 'EXTERNALIZE';
 
@@ -107,7 +108,7 @@ export default class ProtocolState {
     addAcceptedPrepared(b: ScpBallot) {
         const h = hashBallot(b);
         if (this.acceptedPrepared.map(hashBallot).indexOf(h) < 0) {
-            this.acceptedPrepared.push(b);
+            this.acceptedPrepared.push(_.cloneDeep(b));
             return true;
         }
         return false;
@@ -116,7 +117,7 @@ export default class ProtocolState {
     addConfirmedPrepared(b: ScpBallot) {
         const h = hashBallot(b);
         if (this.confirmedPrepared.map(hashBallot).indexOf(h) < 0) {
-            this.confirmedPrepared.push(b);
+            this.confirmedPrepared.push(_.cloneDeep(b));
             return true;
         }
         return false;
@@ -125,7 +126,16 @@ export default class ProtocolState {
     addAcceptedCommited(b: ScpBallot) {
         const h = hashBallot(b);
         if (this.acceptedCommitted.map(hashBallot).indexOf(h) < 0) {
-            this.acceptedCommitted.push(b);
+            this.acceptedCommitted.push(_.cloneDeep(b));
+            return true;
+        }
+        return false;
+    }
+
+    addConfirmedCommited(b: ScpBallot) {
+        const h = hashBallot(b);
+        if (this.confirmedCommitted.map(hashBallot).indexOf(h) < 0) {
+            this.confirmedCommitted.push(_.cloneDeep(b));
             return true;
         }
         return false;
