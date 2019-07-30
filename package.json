@@ -6,7 +6,8 @@
     "jest": "^24.8.0",
     "lodash": "^4.17.14",
     "toml": "^3.0.0",
-    "uuid": "^3.3.2"
+    "uuid": "^3.3.2",
+    "yargs": "^13.3.0"
   },
   "scripts": {
     "start": "ts-node src/index.ts",
@@ -22,5 +23,12 @@
     "ts-jest": "^24.0.2",
     "ts-node": "^8.3.0",
     "typescript": "^3.5.2"
-  }
+  },
+  "name": "tixl-consensus",
+  "version": "1.0.0",
+  "description": "Stellar Consensus Protocol Prototype implementation in Typescript",
+  "main": "src/index.ts",
+  "repository": "git@github.com:tixl/tixl-consensus.git",
+  "author": "Bernd Strehl <bernd@tixl.me>",
+  "license": "MIT"
 }
