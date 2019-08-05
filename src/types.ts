@@ -43,6 +43,7 @@ export interface BaseMessageEnvelope {
     sender: PublicKey
     slices: ScpSlices
     timestamp: number
+    slot: number;
 }
 
 export interface ScpNominateEnvelope extends BaseMessageEnvelope {

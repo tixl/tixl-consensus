@@ -127,6 +127,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
 
     const sendCommitMessage = () => {
         const msg: ScpCommitEnvelope = {
+            slot: state.options.slot,
             message: state.commit,
             sender: state.options.self,
             type: "ScpCommit" as "ScpCommit",
@@ -134,6 +135,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
             slices: state.options.slices
         }
         broadcast(msg);
+        receiveCommit(msg);
     }
 
     const checkEnterExternalizePhase = () => {

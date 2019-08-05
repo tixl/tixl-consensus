@@ -13,6 +13,7 @@ export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, ent
         state.nominate.accepted = state.nominate.accepted.sort()
         if (state.phase !== 'NOMINATE') return;
         const msg: ScpNominateEnvelope = {
+            slot: state.options.slot,
             type: "ScpNominate" as "ScpNominate",
             message: state.nominate,
             sender: state.options.self,
@@ -20,6 +21,9 @@ export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, ent
             timestamp: Date.now(),
         }
         broadcast(msg)
+        state.nominateStorage.set(msg.sender, msg.message, msg.timestamp);
+        msg.message.voted.forEach(transaction => state.TNMS.set(transaction, msg.sender, 'vote'))
+        msg.message.accepted.forEach(transaction => state.TNMS.set(transaction, msg.sender, 'accept'))
     }
 
     const onConfirmedUpdated = () => {

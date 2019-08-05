@@ -1,0 +1,4 @@
+pk = "D"
+slices = {threshold = 2, validators = ['A', 'B', 'C']}
+ports = [8495,8496,8497]
+port = 8498

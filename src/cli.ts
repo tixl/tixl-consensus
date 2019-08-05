@@ -1,5 +1,3 @@
-import * as toml from 'toml';
-import fs = require('fs');
 import { EventEmitter } from 'events';
 import { BroadcastFunction, protocol } from './protocol';
 import { MessageEnvelope, ScpSlices } from './types';
@@ -8,6 +6,7 @@ import * as _ from 'lodash';
 import { envelopeFormatter } from './formatters';
 import chalk from 'chalk';
 import * as yargs from 'yargs';
+import { parseConfig } from './parseConfig';
 
 const ta = _.range(0, 10).map(i => `T${i}`);
 
@@ -43,9 +42,7 @@ const startSlot = slot //25
 const defaultDelay = { min: mindelay, max: maxdelay };
 const determineEndInterval = 1000;
 
-const cfgFile = fs.readFileSync('./config.toml', "utf8");
-const config = toml.parse(cfgFile)
-const nodes = config.nodes as any;
+const { nodes } = parseConfig();
 
 const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
     console.log('+++++++++++++++++++++++++++')

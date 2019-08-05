@@ -240,6 +240,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
 
     const sendPrepareMessage = () => {
         const msg: ScpPrepareEnvelope = {
+            slot: state.options.slot,
             message: state.prepare,
             sender: state.options.self,
             type: "ScpPrepare" as 'ScpPrepare',
@@ -247,6 +248,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
             timestamp: Date.now(),
         }
         broadcast(msg);
+        receivePrepare(msg);
     }
 
     const checkEnterCommitPhase = () => {

@@ -8,6 +8,7 @@ export const externalize = (state: ProtocolState, broadcast: BroadcastFunction) 
 
     const sendExternalizeMessage = () => {
         const msg: ScpExternalizeEnvelope = {
+            slot: state.options.slot,
             message: state.externalize,
             sender: state.options.self,
             type: "ScpExternalize" as 'ScpExternalize',
@@ -16,6 +17,7 @@ export const externalize = (state: ProtocolState, broadcast: BroadcastFunction) 
 
         }
         broadcast(msg);
+        receiveExternalize(msg);
     }
 
     const enterExternalizePhase = () => {

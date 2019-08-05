@@ -12,6 +12,10 @@
     "yargs": "^13.3.0"
   },
   "scripts": {
+    "start:A": "ts-node src/client.ts -c config-a.toml",
+    "start:B": "ts-node src/client.ts -c config-b.toml",
+    "start:C": "ts-node src/client.ts -c config-c.toml",
+    "start:D": "ts-node src/client.ts -c config-d.toml",
     "start": "ts-node src/client.ts",
     "cli": "ts-node src/cli.ts",
     "test": "jest"
