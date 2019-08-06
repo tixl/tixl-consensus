@@ -1,5 +1,5 @@
 import { ScpBallot, ScpPrepareEnvelope } from "../types";
-import { BroadcastFunction, } from "../protocol";
+import { BroadcastFunction } from "../index";
 import ProtocolState from '../ProtocolState';
 import { hashBallot, isBallotLower, hashBallotValue, infinityCounter } from "../helpers";
 import { quorumThreshold, blockingThreshold } from "../validateSlices";

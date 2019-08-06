@@ -1,4 +1,0 @@
-pk = "A"
-slices = {threshold = 2, validators = ['B', 'C', 'D']}
-ports = [8496,8497,8498]
-port = 8495

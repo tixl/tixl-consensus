@@ -1,5 +1,5 @@
 import { ScpCommitEnvelope } from "../types";
-import { BroadcastFunction } from "../protocol";
+import { BroadcastFunction } from "../index";
 import ProtocolState from '../ProtocolState';
 import { hashBallotValue, isBallotLower, infinityCounter } from "../helpers";
 import { quorumThreshold, blockingThreshold } from "../validateSlices";

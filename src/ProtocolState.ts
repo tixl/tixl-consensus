@@ -2,7 +2,7 @@ import { PublicKey, ScpSlices, ScpPrepare, ScpCommit, ScpExternalize, ScpBallot,
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { GenericStorage } from './GenericStorage';
 import { isBallotLower, hashBallot } from "./helpers";
-import { ProtocolOptions } from "./protocol";
+import { ProtocolOptions } from "./index";
 import * as _ from 'lodash';
 
 export type ProtocolPhase = 'NOMINATE' | 'PREPARE' | 'COMMIT' | 'EXTERNALIZE';
@@ -80,7 +80,7 @@ export default class ProtocolState {
     }
 
     log(...args: any[]) {
-        this.options.enableLog && console.log(`${this.options.self} (${this.phase}):`, ...args);
+        this.options.logDebug && console.log(`${this.options.self} (${this.phase}):`, ...args);
     }
 
     getHighestConfirmedPreparedBallot() {

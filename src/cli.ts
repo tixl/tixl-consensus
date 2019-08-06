@@ -1,10 +1,8 @@
 import { EventEmitter } from 'events';
-import { BroadcastFunction, protocol } from './protocol';
+import protocol, { BroadcastFunction } from './index';
 import { MessageEnvelope, ScpSlices } from './types';
 import * as Chance from 'chance';
 import * as _ from 'lodash';
-import { envelopeFormatter } from './formatters';
-import chalk from 'chalk';
 import * as yargs from 'yargs';
 import { parseConfig } from './parseConfig';
 
@@ -42,7 +40,7 @@ const startSlot = slot //25
 const defaultDelay = { min: mindelay, max: maxdelay };
 const determineEndInterval = 1000;
 
-const { nodes } = parseConfig();
+const { nodes } = parseConfig('./simConfig.toml');
 
 const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
     console.log('+++++++++++++++++++++++++++')
@@ -55,7 +53,6 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
 
     const evt = new EventEmitter();
     const broadcast: BroadcastFunction = (envelope: MessageEnvelope) => {
-        console.log(chalk.green(`${slot} Node ${chalk.bold(envelope.sender)} sends    `), envelopeFormatter(envelope));
         msgCounter++;
         evt.emit('broadcast', JSON.stringify(envelope))
         if (envelope.type === 'ScpExternalize') {
@@ -83,16 +80,13 @@ const wrapSCP = async (slot: number) => new Promise((resolve, reject) => {
             threshold: (node as any).slices.t,
             validators: (node as any).slices.validators,
         };
-        const { receive, init } = protocol(broadcast, { enableLog, slot, self: (node as any).pk, slices, suggestedValues: getTransactionsForNode(i) })
+        const { receive, init } = protocol(broadcast, { logDebug: enableLog, logMessages: true, slot, self: (node as any).pk, slices, suggestedValues: getTransactionsForNode(i) })
         inits.push(init);
         evt.addListener('broadcast', (e: string) => {
             const envelope: MessageEnvelope = JSON.parse(e);
             const delay_ = chance.integer(defaultDelay);
             setTimeout(() => {
-                const formatted = envelopeFormatter(envelope);
-                console.log(chalk.red(`${slot} Node ${chalk.bold((node as any).pk)} receives (${delay_}ms)  `), formatted);
                 receive(envelope);
-
             }, delay_);
         });
     }

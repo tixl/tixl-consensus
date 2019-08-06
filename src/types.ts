@@ -67,3 +67,14 @@ export interface ScpExternalizeEnvelope extends BaseMessageEnvelope {
 }
 
 export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope | ScpCommitEnvelope | ScpExternalizeEnvelope
+
+export type BroadcastFunction = (envelope: MessageEnvelope) => void;
+
+export interface ProtocolOptions {
+    self: PublicKey
+    slices: ScpSlices
+    suggestedValues: Value[],
+    slot: number;
+    logDebug: boolean;
+    logMessages: boolean;
+}

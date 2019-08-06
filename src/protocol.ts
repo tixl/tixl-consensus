@@ -1,4 +1,4 @@
-import { ScpSlices, Value, PublicKey, MessageEnvelope } from './types';
+import { PublicKey, MessageEnvelope, BroadcastFunction, ProtocolOptions } from './types';
 import { getNeighbors, getPriority } from './neighbors';
 import * as _ from 'lodash';
 import ProtocolState from './ProtocolState';
@@ -7,16 +7,10 @@ import { prepare } from './phases/prepare';
 import { nominate } from './phases/nominate';
 import { externalize } from './phases/externalize';
 import { hash } from './helpers';
+import chalk from 'chalk';
+import { envelopeFormatter } from './formatters';
 
-export type BroadcastFunction = (envelope: MessageEnvelope) => void;
 
-export interface ProtocolOptions {
-    self: PublicKey
-    slices: ScpSlices
-    suggestedValues: Value[],
-    slot: number;
-    enableLog: boolean;
-}
 
 export type checkQuorumForCounterFunction = (increaseFunc: () => void) => void;
 export type checkBlockingSetForCounterFunction = (setFunc: (value: number) => void) => void;
@@ -33,6 +27,7 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
         const h = hash({ ...envelope, timestamp: null });
         if (!sentMessages.has(h)) {
             sentMessages.set(h, true);
+            if (state.options.logMessages) console.log(chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender)} sends    `), envelopeFormatter(envelope));
             broadcast(envelope);
         }
     }
@@ -45,6 +40,7 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
 
     const receive = (envelope: MessageEnvelope) => {
         // TODO: Find a better way to set the slices
+        if (state.options.logMessages) console.log(chalk.red(`${state.options.slot} Node ${chalk.bold(state.options.self)} receives `), envelopeFormatter(envelope));
         state.nodeSliceMap.set(envelope.sender, envelope.slices);
         switch (envelope.type) {
             case "ScpNominate": receiveNominate(envelope); break;

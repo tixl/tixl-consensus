@@ -1,5 +1,5 @@
 import { ScpNominateEnvelope, Value } from "../types";
-import { BroadcastFunction } from "../protocol";
+import { BroadcastFunction } from "../index";
 import ProtocolState from '../ProtocolState';
 import { quorumThreshold, blockingThreshold } from "../validateSlices";
 import * as _ from 'lodash';

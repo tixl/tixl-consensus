@@ -1,5 +1,5 @@
 import { ScpExternalizeEnvelope } from "../types";
-import { BroadcastFunction } from "../protocol";
+import { BroadcastFunction } from "../index";
 import ProtocolState from '../ProtocolState';
 import * as _ from 'lodash';
 
