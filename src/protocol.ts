@@ -27,7 +27,7 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
       sentMessages.set(h, true);
       if (state.options.logMessages)
         console.log(
-          chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender)} sends    `),
+          chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender.slice(0,8))} sends    `),
           envelopeFormatter(envelope),
         );
       broadcast(envelope);
@@ -51,7 +51,7 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
     // TODO: Find a better way to set the slices
     if (state.options.logMessages)
       console.log(
-        chalk.red(`${state.options.slot} Node ${chalk.bold(state.options.self)} receives `),
+        chalk.red(`${state.options.slot} Node ${chalk.bold(state.options.self.slice(0,8))} receives `),
         envelopeFormatter(envelope),
       );
     state.nodeSliceMap.set(envelope.sender, envelope.slices);
