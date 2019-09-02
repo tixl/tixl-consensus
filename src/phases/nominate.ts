@@ -1,10 +1,10 @@
-import { ScpNominateEnvelope, Value } from '../types';
+import { ScpNominateEnvelope, Value, ValidationFunction } from '../types';
 import { BroadcastFunction } from '../index';
 import ProtocolState from '../ProtocolState';
 import { quorumThreshold, blockingThreshold } from '../validateSlices';
 import * as _ from 'lodash';
 
-export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, enterPreparePhase: () => void) => {
+export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, enterPreparePhase: () => void, validate: ValidationFunction) => {
   const log = (...args: any[]) => state.log(...args);
 
   const onNominateUpdated = () => {
@@ -66,8 +66,8 @@ export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, ent
     envelope.message.voted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'vote'));
     envelope.message.accepted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'accept'));
     if (state.priorityNodes.includes(envelope.sender)) {
-      // TODO: Check validity of values
-      addToVotes([...envelope.message.voted, ...envelope.message.accepted]);
+      const validTransactions = [...envelope.message.voted, ...envelope.message.accepted].filter(validate);
+      addToVotes(validTransactions);
     }
     const accepted = state.nominate.voted.filter(transaction => {
       const voteOrAccepts = state.TNMS.get(transaction, ['vote', 'accept']);

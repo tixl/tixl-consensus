@@ -1,4 +1,4 @@
-import { PublicKey, MessageEnvelope, BroadcastFunction, ProtocolOptions } from './types';
+import { PublicKey, MessageEnvelope, ProtocolOptions, ProtocolFunctions } from './types';
 import { getNeighbors, getPriority } from './neighbors';
 import * as _ from 'lodash';
 import ProtocolState from './ProtocolState';
@@ -16,7 +16,8 @@ export type checkBlockingSetForCounterFunction = (setFunc: (value: number) => vo
 const baseTimeoutValue = 1000;
 const timeoutValue = 1000;
 
-export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions) => {
+export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions) => {
+  const { getInput, broadcast, validate } = functions;
   const state = new ProtocolState(options);
   const log = (...args: any[]) => state.log(...args);
 
@@ -27,7 +28,7 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
       sentMessages.set(h, true);
       if (state.options.logMessages)
         console.log(
-          chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender.slice(0,8))} sends    `),
+          chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender.slice(0, 8))} sends    `),
           envelopeFormatter(envelope),
         );
       broadcast(envelope);
@@ -45,13 +46,13 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
     sendEnvelope,
     enterCommitPhase,
   );
-  const { receiveNominate, addToVotes } = nominate(state, sendEnvelope, enterPreparePhase);
+  const { receiveNominate, addToVotes } = nominate(state, sendEnvelope, enterPreparePhase, validate);
 
   const receive = (envelope: MessageEnvelope) => {
     // TODO: Find a better way to set the slices
     if (state.options.logMessages)
       console.log(
-        chalk.red(`${state.options.slot} Node ${chalk.bold(state.options.self.slice(0,8))} receives `),
+        chalk.red(`${state.options.slot} Node ${chalk.bold(state.options.self.slice(0, 8))} receives `),
         envelopeFormatter(envelope),
       );
     state.nodeSliceMap.set(envelope.sender, envelope.slices);
@@ -104,13 +105,15 @@ export const protocol = (broadcast: BroadcastFunction, options: ProtocolOptions)
       // add votes from newly elected leader
       const lastNominate = state.nominateStorage.getValueFromNode(maxPriorityNeighbor);
       if (lastNominate) {
-        addToVotes([...lastNominate.accepted, ...lastNominate.voted]);
+        const validTransactions = [...lastNominate.accepted, ...lastNominate.voted].filter(validate);
+        addToVotes(validTransactions);
       }
     }
     log({ maxPriorityNeighbor });
 
     if (state.priorityNodes.includes(state.options.self)) {
-      addToVotes(state.options.suggestedValues);
+      const suggestedTransactions = getInput();
+      addToVotes(suggestedTransactions);
     }
 
     state.nominationTimeout = setTimeout(() => {
