@@ -89,7 +89,7 @@ export default class ProtocolState {
   }
 
   log(...args: any[]) {
-    this.options.logDebug && console.log(`${this.options.self} (${this.phase}):`, ...args);
+    this.options.logDebug && console.log(`${this.options.self.slice(0, 4)} (${this.phase}):`, ...args);
   }
 
   getHighestConfirmedPreparedBallot() {

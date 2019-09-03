@@ -1,23 +1,23 @@
 import { EventEmitter } from 'events';
 import protocol, { BroadcastFunction } from './index';
-import { MessageEnvelope, ScpSlices } from './types';
+import { MessageEnvelope, ScpSlices, ProtocolFunctions } from './types';
 import * as Chance from 'chance';
 import * as _ from 'lodash';
 import * as yargs from 'yargs';
 import { parseConfig } from './parseConfig';
 
-const ta = _.range(0, 10).map(i => `T${i}`);
+const ta = _.range(0, 10).map(i => `TX${i}`);
 
 const getTransactionsForNode = (i: number) => {
   switch (i) {
     case 1:
-      return [ta[0], ta[1], ta[2], ta[3], ta[4]];
+      return [ta[0], ta[1], ta[2], ta[3], ta[4], 'TS1'];
     case 2:
-      return [ta[5], ta[6], ta[7], ta[8], ta[9]];
+      return [ta[5], ta[6], ta[7], ta[8], ta[9], 'TS2'];
     case 3:
-      return [ta[0], ta[2], ta[4]];
+      return [ta[0], ta[2], ta[4], 'TS3'];
     case 4:
-      return [ta[1], ta[3]];
+      return [ta[1], ta[3], 'TS4'];
     default:
       return [];
   }
@@ -85,13 +85,17 @@ const wrapSCP = async (slot: number) =>
         threshold: (node as any).slices.t,
         validators: (node as any).slices.validators,
       };
-      const { receive, init } = protocol(broadcast, {
+      const functions: ProtocolFunctions = {
+        broadcast,
+        validate: (x: string) => { x; return true; },
+        getInput: () => getTransactionsForNode(i)
+      }
+      const { receive, init } = protocol(functions, {
         logDebug: enableLog,
         logMessages: true,
         slot,
         self: (node as any).pk,
         slices,
-        suggestedValues: getTransactionsForNode(i),
       });
       inits.push(init);
       evt.addListener('broadcast', (e: string) => {

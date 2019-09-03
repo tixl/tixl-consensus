@@ -122,10 +122,15 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions)
     }, baseTimeoutValue + timeoutValue * state.nominationRound);
   };
 
+  const abort = () => {
+    state.counterTimeout && clearTimeout(state.counterTimeout);
+    state.nominationTimeout && clearTimeout(state.nominationTimeout);
+  }
+
   // Initialize
   const init = () => {
     determinePriorityNode();
   };
 
-  return { receive, init };
+  return { receive, init, abort };
 };
