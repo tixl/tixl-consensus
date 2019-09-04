@@ -11,7 +11,7 @@ export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, ent
     state.nominate.voted = state.nominate.voted.sort();
     // Changed this for test
     state.nominate.accepted = _.uniq([...state.nominate.accepted, ...state.confirmedValues]).sort();
-    if (state.phase !== 'NOMINATE') return;
+    // if (state.phase !== 'NOMINATE') return;
     const msg: ScpNominateEnvelope = {
       slot: state.options.slot,
       type: 'ScpNominate' as 'ScpNominate',
