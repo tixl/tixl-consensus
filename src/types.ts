@@ -70,8 +70,8 @@ export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope | ScpComm
 
 export type TransactionHash = string;
 export type BroadcastFunction = (envelope: MessageEnvelope) => void;
-export type ValidationFunction = (transactionHash: TransactionHash) => boolean;
-export type InputFunction = () => TransactionHash[];
+export type ValidationFunction = (transactionHash: TransactionHash) => Promise<boolean>;
+export type InputFunction = () => Promise<TransactionHash[]>;
 
 
 export interface ProtocolOptions {

@@ -105,15 +105,20 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions)
       // add votes from newly elected leader
       const lastNominate = state.nominateStorage.getValueFromNode(maxPriorityNeighbor);
       if (lastNominate) {
-        const validTransactions = [...lastNominate.accepted, ...lastNominate.voted].filter(validate);
-        addToVotes(validTransactions);
+        const possibleTransactions = [...lastNominate.accepted, ...lastNominate.voted];
+        const validTransactions: string[] = [];
+        const promises = possibleTransactions.map(tx => {
+          return validate(tx).then(isValid => {
+            if (isValid) validTransactions.push(tx);
+          });
+        });
+        Promise.all(promises).then(() => addToVotes(validTransactions));
       }
     }
     log({ maxPriorityNeighbor });
 
     if (state.priorityNodes.includes(state.options.self)) {
-      const suggestedTransactions = getInput();
-      addToVotes(suggestedTransactions);
+      getInput().then(addToVotes);
     }
 
     state.nominationTimeout = setTimeout(() => {
@@ -125,7 +130,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions)
   const abort = () => {
     state.counterTimeout && clearTimeout(state.counterTimeout);
     state.nominationTimeout && clearTimeout(state.nominationTimeout);
-  }
+  };
 
   // Initialize
   const init = () => {

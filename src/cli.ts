@@ -8,7 +8,7 @@ import { parseConfig } from './parseConfig';
 
 const ta = _.range(0, 10).map(i => `TX${i}`);
 
-const getTransactionsForNode = (i: number) => {
+const getTransactionsForNode = async (i: number) => {
   switch (i) {
     case 1:
       return [ta[0], ta[1], ta[2], ta[3], ta[4], 'TS1'];
@@ -87,9 +87,12 @@ const wrapSCP = async (slot: number) =>
       };
       const functions: ProtocolFunctions = {
         broadcast,
-        validate: (x: string) => { x; return true; },
-        getInput: () => getTransactionsForNode(i)
-      }
+        validate: async (x: string) => {
+          x;
+          return true;
+        },
+        getInput: () => getTransactionsForNode(i),
+      };
       const { receive, init } = protocol(functions, {
         logDebug: enableLog,
         logMessages: true,

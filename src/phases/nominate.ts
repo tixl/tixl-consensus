@@ -4,7 +4,12 @@ import ProtocolState from '../ProtocolState';
 import { quorumThreshold, blockingThreshold } from '../validateSlices';
 import * as _ from 'lodash';
 
-export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, enterPreparePhase: () => void, validate: ValidationFunction) => {
+export const nominate = (
+  state: ProtocolState,
+  broadcast: BroadcastFunction,
+  enterPreparePhase: () => void,
+  validate: ValidationFunction,
+) => {
   const log = (...args: any[]) => state.log(...args);
 
   const onNominateUpdated = () => {
@@ -69,8 +74,14 @@ export const nominate = (state: ProtocolState, broadcast: BroadcastFunction, ent
     envelope.message.voted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'vote'));
     envelope.message.accepted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'accept'));
     if (state.priorityNodes.includes(envelope.sender)) {
-      const validTransactions = [...envelope.message.voted, ...envelope.message.accepted].filter(validate);
-      addToVotes(validTransactions);
+      const possibleTransactions = [...envelope.message.voted, ...envelope.message.accepted];
+      const validTransactions: string[] = [];
+      const promises = possibleTransactions.map(tx => {
+        return validate(tx).then(isValid => {
+          if (isValid) validTransactions.push(tx);
+        });
+      });
+      Promise.all(promises).then(() => addToVotes(validTransactions));
     }
     const accepted = state.nominate.voted.filter(transaction => {
       const voteOrAccepts = state.TNMS.get(transaction, ['vote', 'accept']);

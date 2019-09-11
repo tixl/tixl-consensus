@@ -2,7 +2,7 @@ import { MessageEnvelope } from './types';
 import chalk from 'chalk';
 
 export const envelopeFormatter = (envelope: MessageEnvelope): string => {
-  const sender = chalk.bold.green(envelope.sender.slice(0,8) + ':');
+  const sender = chalk.bold.green(envelope.sender.slice(0, 8) + ':');
   let type = '';
   switch (envelope.type) {
     case 'ScpNominate':
