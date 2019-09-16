@@ -88,10 +88,6 @@ export default class ProtocolState {
     };
   }
 
-  log(...args: any[]) {
-    this.options.logDebug && console.log(`${this.options.self.slice(0, 4)} (${this.phase}):`, ...args);
-  }
-
   getHighestConfirmedPreparedBallot() {
     if (this.confirmedPrepared.length) {
       const highestConfirmed = this.confirmedPrepared.reduce((acc, b) => {

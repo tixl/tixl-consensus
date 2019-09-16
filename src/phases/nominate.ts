@@ -3,6 +3,7 @@ import { BroadcastFunction } from '../index';
 import ProtocolState from '../ProtocolState';
 import { quorumThreshold, blockingThreshold } from '../validateSlices';
 import * as _ from 'lodash';
+const log = require('debug')('tixl-consensus:debug');
 
 export const nominate = (
   state: ProtocolState,
@@ -10,7 +11,6 @@ export const nominate = (
   enterPreparePhase: () => void,
   validate: ValidationFunction,
 ) => {
-  const log = (...args: any[]) => state.log(...args);
 
   const onNominateUpdated = () => {
     state.nominate.voted = state.nominate.voted.sort();
@@ -33,7 +33,7 @@ export const nominate = (
 
   const onConfirmedUpdated = () => {
     if (state.nominationTimeout) clearTimeout(state.nominationTimeout);
-    log('Confirmed Nominates: ', state.confirmedValues.sort().join(' '));
+    log('Confirmed Nominates: ' + state.confirmedValues.sort().join(' '));
     if (state.phase === 'NOMINATE') {
       enterPreparePhase();
     }

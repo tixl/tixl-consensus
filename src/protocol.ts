@@ -9,6 +9,8 @@ import { externalize } from './phases/externalize';
 import { hash } from './helpers';
 import chalk from 'chalk';
 import { envelopeFormatter } from './formatters';
+const log = require('debug')('tixl-consensus:debug');
+const logMsg = require('debug')('tixl-consensus:messages');
 
 export type checkQuorumForCounterFunction = (increaseFunc: () => void) => void;
 export type checkBlockingSetForCounterFunction = (setFunc: (value: number) => void) => void;
@@ -19,18 +21,17 @@ const timeoutValue = 1000;
 export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions) => {
   const { getInput, broadcast, validate } = functions;
   const state = new ProtocolState(options);
-  const log = (...args: any[]) => state.log(...args);
+  // const log = (...args: any[]) => state.log(...args);
 
   const sentMessages = new Map<bigint, boolean>();
   const sendEnvelope = (envelope: MessageEnvelope) => {
     const h = hash({ ...envelope, timestamp: null });
     if (!sentMessages.has(h)) {
       sentMessages.set(h, true);
-      if (state.options.logMessages)
-        console.log(
-          chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender.slice(0, 8))} sends    `),
+      logMsg(
+        chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender.slice(0, 8))} sends    `) +
           envelopeFormatter(envelope),
-        );
+      );
       broadcast(envelope);
     }
   };
@@ -50,11 +51,10 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions)
 
   const receive = (envelope: MessageEnvelope) => {
     // TODO: Find a better way to set the slices
-    if (state.options.logMessages)
-      console.log(
-        chalk.red(`${state.options.slot} Node ${chalk.bold(state.options.self.slice(0, 8))} receives `),
+    logMsg(
+      chalk.red(`${state.options.slot} Node ${chalk.bold(state.options.self.slice(0, 8))} receives `) +
         envelopeFormatter(envelope),
-      );
+    );
     state.nodeSliceMap.set(envelope.sender, envelope.slices);
     switch (envelope.type) {
       case 'ScpNominate':
@@ -115,7 +115,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions)
         Promise.all(promises).then(() => addToVotes(validTransactions));
       }
     }
-    log({ maxPriorityNeighbor });
+    log(`Leader: ${maxPriorityNeighbor}`);
 
     if (state.priorityNodes.includes(state.options.self)) {
       getInput().then(addToVotes);

@@ -4,9 +4,10 @@ import ProtocolState from '../ProtocolState';
 import { hashBallot, isBallotLower, hashBallotValue, infinityCounter } from '../helpers';
 import { quorumThreshold, blockingThreshold } from '../validateSlices';
 import * as _ from 'lodash';
+import { formatBallot } from '../formatters';
+const log = require('debug')('tixl-consensus:debug');
 
 export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, enterCommitPhase: () => void) => {
-  const log = (...args: any[]) => state.log(...args);
 
   const checkPrepareBallotAcceptQuorum = (ballot: ScpBallot) => {
     const ballotHash = hashBallot(ballot);
@@ -25,7 +26,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
       .filter(e => hashBallot({ counter: infinityCounter, value: e.commit.value }) === ballotHash);
     const signers = [...voteOrAccept, ...commitVotes, ...externalizeVotes].map(p => p.node);
     if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
-      state.addAcceptedPrepared(ballot) && log('Accept Prepare (Quorum)', ballot);
+      state.addAcceptedPrepared(ballot) && log('Accept Prepare (Quorum) ' + formatBallot(ballot));
     }
   };
 
@@ -43,7 +44,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
       .filter(p => p.prepared && hashBallot(p.prepared) === ballotHash);
     const nodes = [...acceptPrepares, ...commitAccepts, ...externalizes].map(p => p.node);
     if (blockingThreshold(state.options.slices, nodes)) {
-      state.addAcceptedPrepared(ballot) && log('Accept Prepare (Blocking Set)', ballot);
+      state.addAcceptedPrepared(ballot) && log('Accept Prepare (Blocking Set) ' + formatBallot(ballot));
     }
   };
 
@@ -63,7 +64,8 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
       .filter(x => hashBallotValue(x.commit) === ballotValueHash && n >= x.commit.counter);
     const signersVoteOrAccept = [...prepareCommitVotes, ...commits, ...externalizes].map(x => x.node);
     if (quorumThreshold(state.nodeSliceMap, signersVoteOrAccept, state.options.self)) {
-      state.addAcceptedCommited(state.prepare.prepared!) && log('Accept Commit (Quorum) ', state.prepare.prepared);
+      state.addAcceptedCommited(state.prepare.prepared!) &&
+        log('Accept Commit (Quorum) ' + formatBallot(state.prepare.prepared));
     }
 
     const commitAccepts = state.commitStorage
@@ -71,7 +73,8 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
       .filter(x => hashBallotValue(x.ballot) === ballotValueHash && x.cCounter <= n && n <= x.hCounter);
     const signersAccept = [...commitAccepts, ...externalizes].map(x => x.node);
     if (blockingThreshold(state.options.slices, signersAccept)) {
-      state.addAcceptedCommited(state.prepare.prepared) && log('Accept Commit (Blocking Set) ', state.prepare.prepared);
+      state.addAcceptedCommited(state.prepare.prepared) &&
+        log('Accept Commit (Blocking Set) ' + formatBallot(state.prepare.prepared));
     }
   };
 
@@ -95,7 +98,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
       .map(e => e.node);
     const signers = _.uniq([...acceptPrepares, ...commits, ...externalizes]);
     if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
-      state.addConfirmedPrepared(ballot) && log('Confirm Prepare (Quorum)', ballot);
+      state.addConfirmedPrepared(ballot) && log('Confirm Prepare (Quorum)' + formatBallot(ballot));
     }
   };
 
@@ -145,7 +148,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     } else {
       state.prepare.prepared = _.cloneDeep(highest);
     }
-    log('Set prepare field to ', state.prepare.prepared);
+    log('Set prepare field to ' + formatBallot(state.prepare.prepared));
     // const ballotsLowerOrEqualThanPrepare = state.acceptedPrepared.filter(b => isBallotLowerOrEqual(b, state.prepare.ballot))
     // if (ballotsLowerOrEqualThanPrepare.length) {
     //     const highestAcceptedPreparedBallotNotExceedingBallotField =
@@ -217,7 +220,9 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     const nodes = [...fromPrepare, ...fromCommit, ...fromExternalize].map(x => x.node);
     if (blockingThreshold(state.options.slices, nodes)) {
       const minCounter = hasExternalizeMessage ? Math.min(...counters, infinityCounter) : Math.min(...counters);
-      log(`Found blocking set for timers: increase from ${state.prepare.ballot.counter} to ${minCounter}`);
+      log(
+        `Found blocking set for timers: increase from ${state.prepare.ballot.counter} to ${minCounter}`,
+      );
       state.prepare.ballot.counter = minCounter;
       checkCounterBlockingSet(); // do recursively
       return true;
@@ -228,10 +233,12 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
 
   const armQuorumCounterTimer = () => {
     const currentCounter = state.prepare.ballot.counter;
-    log('Arming timer for current counter ', currentCounter);
+    log('Arming timer for current counter ' + currentCounter);
     if (state.counterTimeout) clearTimeout(state.counterTimeout);
     state.counterTimeout = setTimeout(() => {
-      log(`Timer fired for counter ${state.prepare.ballot.counter}: increasing to ${state.prepare.ballot.counter + 1}`);
+      log(
+        `Timer fired for counter ${state.prepare.ballot.counter}: increasing to ${state.prepare.ballot.counter + 1}`,
+      );
       state.prepare.ballot.counter++;
       onBallotCounterChange();
       doPrepareUpdate();

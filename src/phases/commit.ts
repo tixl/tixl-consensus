@@ -4,10 +4,10 @@ import ProtocolState from '../ProtocolState';
 import { hashBallotValue, isBallotLower, infinityCounter } from '../helpers';
 import { quorumThreshold, blockingThreshold } from '../validateSlices';
 import * as _ from 'lodash';
+import { formatBallot } from '../formatters';
+const log = require('debug')('tixl-consensus:debug');
 
 export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enterExternalizePhase: () => void) => {
-  const log = (...args: any[]) => state.log(...args);
-
   const checkCommitBallotAccept = () => {
     const ballot = state.commit.ballot;
     const ballotValueHash = hashBallotValue(ballot);
@@ -24,7 +24,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
       .filter(x => hashBallotValue(x.commit) && n >= x.commit.counter);
     const signersVoteOrAccept = [...prepareCommitVotes, ...commits, ...externalizes].map(x => x.node);
     if (quorumThreshold(state.nodeSliceMap, signersVoteOrAccept, state.options.self)) {
-      state.addAcceptedCommited(ballot) && log('Accept commit (Quorum) ', ballot);
+      state.addAcceptedCommited(ballot) && log('Accept Commit (Quorum) ' + formatBallot(ballot));
     }
 
     const commitAccepts = state.commitStorage
@@ -32,7 +32,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
       .filter(x => hashBallotValue(x.ballot) === ballotValueHash && x.cCounter <= n && n <= x.hCounter);
     const signersAccept = [...commitAccepts, ...externalizes].map(x => x.node);
     if (blockingThreshold(state.options.slices, signersAccept)) {
-      state.addAcceptedCommited(ballot) && log('Accept Commit (Blocking Set)', ballot);
+      state.addAcceptedCommited(ballot) && log('Accept Commit (Blocking Set) ' + formatBallot(ballot));
     }
   };
 
@@ -49,7 +49,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
       .filter(x => hashBallotValue(x.commit) === ballotValueHash);
     const signers = [...acceptCommits, ...externalizes].map(x => x.node);
     if (quorumThreshold(state.nodeSliceMap, signers, state.options.self)) {
-      state.addConfirmedCommited(state.commit.ballot) && log('Confirm Commit (Quorum)', state.commit.ballot);
+      state.addConfirmedCommited(state.commit.ballot) && log('Confirm Commit' + formatBallot(state.commit.ballot));
     }
   };
 
@@ -60,7 +60,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
     } else {
       state.commit.preparedCounter = highest!.counter;
     }
-    log('Set prepare counter to ', state.commit.preparedCounter);
+    log('Set prepare counter to ' + state.commit.preparedCounter);
   };
 
   const recalculateCommitCCounter = () => {
@@ -99,7 +99,7 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
 
   const armQuorumCounterTimer = () => {
     const currentCounter = state.commit.ballot.counter;
-    log('Arming timer for current counter ', currentCounter);
+    log('Arming timer for current counter ' + currentCounter);
     if (state.counterTimeout) clearTimeout(state.counterTimeout);
     state.counterTimeout = setTimeout(() => {
       log(`Timer fired for counter ${state.commit.ballot.counter}: increasing to ${state.commit.ballot.counter + 1}`);

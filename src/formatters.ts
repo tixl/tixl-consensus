@@ -1,4 +1,4 @@
-import { MessageEnvelope } from './types';
+import { MessageEnvelope, ScpBallot } from './types';
 import chalk from 'chalk';
 
 export const envelopeFormatter = (envelope: MessageEnvelope): string => {
@@ -45,3 +45,6 @@ export const envelopeFormatter = (envelope: MessageEnvelope): string => {
   }
   return '';
 };
+
+
+export const formatBallot = (b: ScpBallot) => `<${b.counter},${b.value.join('-')}>`

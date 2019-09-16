@@ -2,6 +2,7 @@ import { ScpExternalizeEnvelope } from '../types';
 import { BroadcastFunction } from '../index';
 import ProtocolState from '../ProtocolState';
 import * as _ from 'lodash';
+const log = require('debug')('tixl-consensus:debug');
 
 export const externalize = (state: ProtocolState, broadcast: BroadcastFunction) => {
   const sendExternalizeMessage = () => {
@@ -21,7 +22,7 @@ export const externalize = (state: ProtocolState, broadcast: BroadcastFunction) 
     state.counterTimeout && clearTimeout(state.counterTimeout);
     state.nominationTimeout && clearTimeout(state.nominationTimeout);
     state.phase = 'EXTERNALIZE';
-    state.log('Entering Externalize Phase');
+    log('Entering Externalize Phase');
     state.externalize.commit = _.cloneDeep(state.commit.ballot);
     state.externalize.hCounter = _.cloneDeep(state.commit.ballot.counter);
     sendExternalizeMessage();
