@@ -24,9 +24,10 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions)
   // const log = (...args: any[]) => state.log(...args);
 
   const sentMessages = new Map<bigint, boolean>();
-  const sendEnvelope = (envelope: MessageEnvelope) => {
+  // SendAnyways will send a message even if it has been sent already
+  const sendEnvelope = (envelope: MessageEnvelope, sendAnyways: boolean = false) => {
     const h = hash({ ...envelope, timestamp: null });
-    if (!sentMessages.has(h)) {
+    if (!sentMessages.has(h) || sendAnyways) {
       sentMessages.set(h, true);
       logMsg(
         chalk.green(`${state.options.slot} Node ${chalk.bold(envelope.sender.slice(0, 8))} sends    `) +

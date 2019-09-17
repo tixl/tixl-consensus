@@ -11,8 +11,7 @@ export const nominate = (
   enterPreparePhase: () => void,
   validate: ValidationFunction,
 ) => {
-
-  const onNominateUpdated = () => {
+  const onNominateUpdated = (timeoutTriggered: boolean = false) => {
     state.nominate.voted = state.nominate.voted.sort();
     // Changed this for test
     state.nominate.accepted = _.uniq([...state.nominate.accepted, ...state.confirmedValues]).sort();
@@ -25,7 +24,13 @@ export const nominate = (
       slices: state.options.slices,
       timestamp: Date.now(),
     };
-    broadcast(msg);
+    broadcast(msg, timeoutTriggered);
+    if (state.nominationRepeatTimeout) clearTimeout(state.nominationRepeatTimeout);
+    if (state.phase === 'NOMINATE') {
+      state.nominationRepeatTimeout = setTimeout(() => {
+        onNominateUpdated(true);
+      }, 1000);
+    }
     state.nominateStorage.set(msg.sender, msg.message, msg.timestamp);
     msg.message.voted.forEach(transaction => state.TNMS.set(transaction, msg.sender, 'vote'));
     msg.message.accepted.forEach(transaction => state.TNMS.set(transaction, msg.sender, 'accept'));

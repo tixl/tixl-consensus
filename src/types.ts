@@ -71,7 +71,7 @@ export interface ScpExternalizeEnvelope extends BaseMessageEnvelope {
 export type MessageEnvelope = ScpNominateEnvelope | ScpPrepareEnvelope | ScpCommitEnvelope | ScpExternalizeEnvelope;
 
 export type TransactionHash = string;
-export type BroadcastFunction = (envelope: MessageEnvelope) => void;
+export type BroadcastFunction = (envelope: MessageEnvelope, sendAnyways?: boolean) => void;
 export type ValidationFunction = (transactionHash: TransactionHash) => Promise<boolean>;
 export type InputFunction = () => Promise<TransactionHash[]>;
 

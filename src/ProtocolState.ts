@@ -21,6 +21,7 @@ export default class ProtocolState {
   phase: ProtocolPhase;
   nominationTimeout: NodeJS.Timeout | null;
   counterTimeout: NodeJS.Timeout | null;
+  nominationRepeatTimeout: NodeJS.Timeout | null;
   prepareTimeoutCounter: number;
   nominationRound: number;
   priorityNodes: PublicKey[];
@@ -48,6 +49,7 @@ export default class ProtocolState {
     this.phase = 'NOMINATE';
     this.nominationTimeout = null;
     this.counterTimeout = null;
+    this.nominationRepeatTimeout = null;
     this.prepareTimeoutCounter = 0;
     this.nominationRound = 1;
     this.priorityNodes = [];
