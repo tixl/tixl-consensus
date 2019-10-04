@@ -33,7 +33,7 @@
     "typescript": "^3.5.2"
   },
   "name": "@tixl/tixl-consensus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Stellar Consensus Protocol Prototype implementation in Typescript",
   "main": "src/index.ts",
   "repository": "git@github.com:tixl/tixl-consensus.git",
