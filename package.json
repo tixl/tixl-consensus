@@ -2,7 +2,7 @@
   "dependencies": {
     "bigint-buffer": "^1.1.2",
     "chalk": "^2.4.2",
-    "chance": "^1.0.18",
+    "chance": "^1.1.0",
     "debug": "^4.1.1",
     "jest": "^24.8.0",
     "lodash": "^4.17.14",
@@ -15,11 +15,16 @@
   "scripts": {
     "start": "ts-node src/cli.ts",
     "cli": "ts-node src/cli.ts",
-    "test": "jest"
+    "test": "jest",
+    "build": "tsc",
+    "prepublish": "npm run build"
   },
+  "files": [
+    "lib"
+  ],
   "devDependencies": {
     "@types/chalk": "^2.2.0",
-    "@types/chance": "^1.0.5",
+    "@types/chance": "^1.0.7",
     "@types/debug": "^4.1.5",
     "@types/jest": "^24.0.15",
     "@types/lodash": "^4.14.135",
@@ -35,7 +40,7 @@
   "name": "@tixl/tixl-consensus",
   "version": "1.0.1",
   "description": "Stellar Consensus Protocol Prototype implementation in Typescript",
-  "main": "src/index.ts",
+  "main": "lib/index.js",
   "repository": "git@github.com:tixl/tixl-consensus.git",
   "author": "Bernd Strehl <bernd@tixl.me>",
   "license": "MIT"

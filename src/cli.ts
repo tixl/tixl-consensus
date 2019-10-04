@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import protocol, { BroadcastFunction } from './index';
 import { MessageEnvelope, ScpSlices, ProtocolFunctions } from './types';
-import * as Chance from 'chance';
+import Chance from 'chance';
 import * as _ from 'lodash';
 import * as yargs from 'yargs';
 import { parseConfig } from './parseConfig';
@@ -24,6 +24,7 @@ const getTransactionsForNode = async (i: number) => {
 };
 
 const argv = yargs
+  //@ts-ignore
   .default('s', 1) // slot
   .default('r', 1)
   .default('x', 50) // delay min

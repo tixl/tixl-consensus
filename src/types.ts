@@ -1,5 +1,3 @@
-import winston = require('winston');
-
 export type PublicKey = string;
 export type Value = string;
 
@@ -81,7 +79,6 @@ export interface ProtocolOptions {
   slot: number;
   logDebug: boolean;
   logMessages: boolean;
-  logger?: winston.Logger;
   logLevel?: 'debug' | 'info' | 'error' | 'warn' | 'verbose' | 'debug';
 }
 
