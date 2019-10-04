@@ -131,6 +131,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions)
   const abort = () => {
     state.counterTimeout && clearTimeout(state.counterTimeout);
     state.nominationTimeout && clearTimeout(state.nominationTimeout);
+    state.nominationRepeatTimeout && clearTimeout(state.nominationRepeatTimeout);
   };
 
   // Initialize
