@@ -8,7 +8,6 @@ import { formatBallot } from '../formatters';
 const log = require('debug')('tixl-consensus:debug');
 
 export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, enterCommitPhase: () => void) => {
-
   const checkPrepareBallotAcceptQuorum = (ballot: ScpBallot) => {
     const ballotHash = hashBallot(ballot);
     const voteOrAccept = state.prepareStorage
@@ -220,9 +219,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     const nodes = [...fromPrepare, ...fromCommit, ...fromExternalize].map(x => x.node);
     if (blockingThreshold(state.options.slices, nodes)) {
       const minCounter = hasExternalizeMessage ? Math.min(...counters, infinityCounter) : Math.min(...counters);
-      log(
-        `Found blocking set for timers: increase from ${state.prepare.ballot.counter} to ${minCounter}`,
-      );
+      log(`Found blocking set for timers: increase from ${state.prepare.ballot.counter} to ${minCounter}`);
       state.prepare.ballot.counter = minCounter;
       checkCounterBlockingSet(); // do recursively
       return true;
@@ -236,9 +233,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
     log('Arming timer for current counter ' + currentCounter);
     if (state.counterTimeout) clearTimeout(state.counterTimeout);
     state.counterTimeout = setTimeout(() => {
-      log(
-        `Timer fired for counter ${state.prepare.ballot.counter}: increasing to ${state.prepare.ballot.counter + 1}`,
-      );
+      log(`Timer fired for counter ${state.prepare.ballot.counter}: increasing to ${state.prepare.ballot.counter + 1}`);
       state.prepare.ballot.counter++;
       onBallotCounterChange();
       doPrepareUpdate();
@@ -294,6 +289,7 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
   const enterPreparePhase = () => {
     state.phase = 'PREPARE';
     log('Entering Prepare Phase');
+    state.logger.info(`CONSENSUS Entering Prepare Phase`, { slot: state.options.slot });
     state.prepare.ballot.value = _.clone(state.confirmedValues);
     sendPrepareMessage();
   };

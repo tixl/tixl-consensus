@@ -13,12 +13,15 @@ import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { GenericStorage } from './GenericStorage';
 import { isBallotLower, hashBallot } from './helpers';
 import { ProtocolOptions } from './index';
+import { Logger } from 'winston';
 import * as _ from 'lodash';
+import { createDefaultLogger } from './defaultLogger';
 
 export type ProtocolPhase = 'NOMINATE' | 'PREPARE' | 'COMMIT' | 'EXTERNALIZE';
 
 export default class ProtocolState {
   phase: ProtocolPhase;
+  logger: Logger;
   nominationTimeout: NodeJS.Timeout | null;
   counterTimeout: NodeJS.Timeout | null;
   nominationRepeatTimeout: NodeJS.Timeout | null;
@@ -44,8 +47,9 @@ export default class ProtocolState {
   externalize: ScpExternalize;
   options: ProtocolOptions;
 
-  constructor(options: ProtocolOptions) {
+  constructor(options: ProtocolOptions, logger?: Logger) {
     this.options = options;
+    this.logger = logger || createDefaultLogger();
     this.phase = 'NOMINATE';
     this.nominationTimeout = null;
     this.counterTimeout = null;
