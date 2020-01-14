@@ -116,7 +116,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
       }
     }
     log(`Leader: ${maxPriorityNeighbor}`);
-    state.logger.info(`CONSENSUS Leader determined: ${maxPriorityNeighbor}`, {slot: state.options.slot})
+    state.logger.info(`CONSENSUS Leader determined: ${maxPriorityNeighbor}`, { slot: state.options.slot });
 
     if (state.priorityNodes.includes(state.options.self)) {
       getInput().then(addToVotes);
@@ -141,5 +141,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
     determinePriorityNode();
   };
 
-  return { receive, init, abort };
+  const getKnownTransactions = () => state.getAllTransactionList();
+
+  return { receive, init, abort, getKnownTransactions };
 };

@@ -32,8 +32,14 @@ export const nominate = (
       }, 1000);
     }
     state.nominateStorage.set(msg.sender, msg.message, msg.timestamp);
-    msg.message.voted.forEach(transaction => state.TNMS.set(transaction, msg.sender, 'vote'));
-    msg.message.accepted.forEach(transaction => state.TNMS.set(transaction, msg.sender, 'accept'));
+    msg.message.voted.forEach(transaction => {
+      state.addToAllTransactionsList(transaction);
+      state.TNMS.set(transaction, msg.sender, 'vote');
+    });
+    msg.message.accepted.forEach(transaction => {
+      state.addToAllTransactionsList(transaction);
+      state.TNMS.set(transaction, msg.sender, 'accept');
+    });
   };
 
   const onConfirmedUpdated = () => {
@@ -76,8 +82,14 @@ export const nominate = (
 
   const receiveNominate = (envelope: ScpNominateEnvelope) => {
     state.nominateStorage.set(envelope.sender, envelope.message, envelope.timestamp);
-    envelope.message.voted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'vote'));
-    envelope.message.accepted.forEach(transaction => state.TNMS.set(transaction, envelope.sender, 'accept'));
+    envelope.message.voted.forEach(transaction => {
+      state.addToAllTransactionsList(transaction);
+      state.TNMS.set(transaction, envelope.sender, 'vote');
+    });
+    envelope.message.accepted.forEach(transaction => {
+      state.addToAllTransactionsList(transaction);
+      state.TNMS.set(transaction, envelope.sender, 'accept');
+    });
     if (state.priorityNodes.includes(envelope.sender)) {
       const possibleTransactions = [...envelope.message.voted, ...envelope.message.accepted];
       const validTransactions: string[] = [];

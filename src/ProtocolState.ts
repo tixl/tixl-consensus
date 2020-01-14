@@ -8,6 +8,7 @@ import {
   ScpNominate,
   Value,
   ScpPrepareEnvelope,
+  TransactionHash,
 } from './types';
 import TransactionNodeMessageStorage from './TransactionNodeMessageStorage';
 import { GenericStorage } from './GenericStorage';
@@ -46,6 +47,7 @@ export default class ProtocolState {
   commit: ScpCommit;
   externalize: ScpExternalize;
   options: ProtocolOptions;
+  allTransactionsList: Map<TransactionHash, boolean>;
 
   constructor(options: ProtocolOptions, logger?: Logger) {
     this.options = options;
@@ -71,6 +73,7 @@ export default class ProtocolState {
     this.confirmedCommitted = [];
     this.commitBallot = null;
     this.confirmedValues = [];
+    this.allTransactionsList = new Map();
     this.nominate = {
       voted: [],
       accepted: [],
@@ -150,5 +153,13 @@ export default class ProtocolState {
       return true;
     }
     return false;
+  }
+
+  addToAllTransactionsList(txh: TransactionHash) {
+    this.allTransactionsList.set(txh, true);
+  }
+
+  getAllTransactionList(): TransactionHash[] {
+    return [...this.allTransactionsList.keys()];
   }
 }
