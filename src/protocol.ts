@@ -116,7 +116,6 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
       }
     }
     log(`Leader: ${maxPriorityNeighbor}`);
-    state.logger.info(`CONSENSUS Leader determined: ${maxPriorityNeighbor}`, { slot: state.options.slot });
 
     if (state.priorityNodes.includes(state.options.self)) {
       getInput().then(addToVotes);
@@ -129,7 +128,6 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
   };
 
   const abort = () => {
-    state.logger.info(`CONSENSUS Aborted, Slot: ${state.options.slot}`);
     state.counterTimeout && clearTimeout(state.counterTimeout);
     state.nominationTimeout && clearTimeout(state.nominationTimeout);
     state.nominationRepeatTimeout && clearTimeout(state.nominationRepeatTimeout);
@@ -137,7 +135,6 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
 
   // Initialize
   const init = () => {
-    state.logger.info(`CONSENSUS Starting, Slot: ${state.options.slot}`);
     determinePriorityNode();
   };
 

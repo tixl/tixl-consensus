@@ -289,7 +289,6 @@ export const prepare = (state: ProtocolState, broadcast: BroadcastFunction, ente
   const enterPreparePhase = () => {
     state.phase = 'PREPARE';
     log('Entering Prepare Phase');
-    state.logger.info(`CONSENSUS Entering Prepare Phase`, { slot: state.options.slot });
     state.prepare.ballot.value = _.clone(state.confirmedValues);
     sendPrepareMessage();
   };

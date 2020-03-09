@@ -23,7 +23,6 @@ export const externalize = (state: ProtocolState, broadcast: BroadcastFunction) 
     state.nominationTimeout && clearTimeout(state.nominationTimeout);
     state.phase = 'EXTERNALIZE';
     log('Entering Externalize Phase');
-    state.logger.info(`CONSENSUS Entering Externalize Phase`, { slot: state.options.slot });
     state.externalize.commit = _.cloneDeep(state.commit.ballot);
     state.externalize.hCounter = _.cloneDeep(state.commit.ballot.counter);
     sendExternalizeMessage();

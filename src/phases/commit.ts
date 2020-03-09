@@ -155,7 +155,6 @@ export const commit = (state: ProtocolState, broadcast: BroadcastFunction, enter
       throw new Error('Should not be empty');
     }
     log('Entering Commit Phase');
-    state.logger.info(`CONSENSUS Entering Commit Phase`, { slot: state.options.slot });
     state.commit.ballot = _.cloneDeep(state.prepare.prepared);
     state.commit.preparedCounter = state.prepare.prepared!.counter;
     doCommitUpdate();
