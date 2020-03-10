@@ -22,6 +22,18 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
   const { getInput, broadcast, validate } = functions;
   const state = new ProtocolState(options, logger);
 
+  const validateSync = async (txs: string[]) => {
+    const validTxs = [];
+    for (let i =0; i<txs.length; i++){
+      const isValid = await validate(txs[i])
+      if(isValid){
+        validTxs.push(txs[i])
+      }
+    }
+    return validTxs;
+  }
+
+
   const sentMessages = new Map<bigint, boolean>();
   // SendAnyways will send a message even if it has been sent already
   const sendEnvelope = (envelope: MessageEnvelope, sendAnyways: boolean = false) => {
@@ -47,7 +59,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
     sendEnvelope,
     enterCommitPhase,
   );
-  const { receiveNominate, addToVotes } = nominate(state, sendEnvelope, enterPreparePhase, validate);
+  const { receiveNominate, addToVotes } = nominate(state, sendEnvelope, enterPreparePhase, validateSync);
 
   const receive = (envelope: MessageEnvelope) => {
     // TODO: Find a better way to set the slices
@@ -88,6 +100,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
     }
   };
 
+
   const determinePriorityNode = () => {
     const neighbors = [
       state.options.self,
@@ -106,13 +119,7 @@ export const protocol = (functions: ProtocolFunctions, options: ProtocolOptions,
       const lastNominate = state.nominateStorage.getValueFromNode(maxPriorityNeighbor);
       if (lastNominate) {
         const possibleTransactions = [...lastNominate.accepted, ...lastNominate.voted];
-        const validTransactions: string[] = [];
-        const promises = possibleTransactions.map(tx => {
-          return validate(tx).then(isValid => {
-            if (isValid) validTransactions.push(tx);
-          });
-        });
-        Promise.all(promises).then(() => addToVotes(validTransactions));
+        validateSync(possibleTransactions).then(validTransactions => addToVotes(validTransactions))
       }
     }
     log(`Leader: ${maxPriorityNeighbor}`);

@@ -9,7 +9,7 @@ export const nominate = (
   state: ProtocolState,
   broadcast: BroadcastFunction,
   enterPreparePhase: () => void,
-  validate: ValidationFunction,
+  validateSync: (txs: string[]) => Promise<string[]>,
 ) => {
   const onNominateUpdated = (timeoutTriggered: boolean = false) => {
     state.nominate.voted = state.nominate.voted.sort();
@@ -92,13 +92,7 @@ export const nominate = (
     });
     if (state.priorityNodes.includes(envelope.sender)) {
       const possibleTransactions = [...envelope.message.voted, ...envelope.message.accepted];
-      const validTransactions: string[] = [];
-      const promises = possibleTransactions.map(tx => {
-        return validate(tx).then(isValid => {
-          if (isValid) validTransactions.push(tx);
-        });
-      });
-      Promise.all(promises).then(() => addToVotes(validTransactions));
+      validateSync(possibleTransactions).then(validTransactions => addToVotes(validTransactions));
     }
     const accepted = state.nominate.voted.filter(transaction => {
       const voteOrAccepts = state.TNMS.get(transaction, ['vote', 'accept']);
